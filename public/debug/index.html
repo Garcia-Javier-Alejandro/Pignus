@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mercado Libre Debug | Pignus</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="debug-shell">
+      <header class="debug-header">
+        <div>
+          <p class="eyebrow">Pignus Debug</p>
+          <h1>Mercado Libre API summary</h1>
+        </div>
+        <a href="/">Home</a>
+      </header>
+
+      <section id="summary" class="debug-summary"></section>
+      <section class="admin-key-panel">
+        <label for="admin-key">Admin API key</label>
+        <div>
+          <input id="admin-key" type="password" autocomplete="off">
+          <button id="save-admin-key" type="button">Save</button>
+        </div>
+      </section>
+      <section id="orders" class="orders"></section>
+    </main>
+
+    <template id="order-template">
+      <article class="order-card">
+        <div class="order-card__header">
+          <div>
+            <h2></h2>
+            <p class="muted"></p>
+          </div>
+          <span class="status-pill"></span>
+        </div>
+        <div class="metrics"></div>
+        <details>
+          <summary>Payments and fee details</summary>
+          <pre></pre>
+        </details>
+      </article>
+    </template>
+
+    <script>
+      const money = new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+      });
+
+      const formatMoney = (value) => money.format(Number(value || 0));
+
+      const metric = (label, value) => {
+        const node = document.createElement('div');
+        node.className = 'metric';
+        node.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+        return node;
+      };
+
+      const adminKeyInput = document.querySelector('#admin-key');
+      const saveAdminKeyButton = document.querySelector('#save-admin-key');
+
+      adminKeyInput.value = localStorage.getItem('pignus.adminApiKey') || '';
+      saveAdminKeyButton.addEventListener('click', () => {
+        localStorage.setItem('pignus.adminApiKey', adminKeyInput.value);
+        render();
+      });
+
+      const render = async () => {
+        const summary = document.querySelector('#summary');
+        const orders = document.querySelector('#orders');
+        const template = document.querySelector('#order-template');
+        const adminKey = localStorage.getItem('pignus.adminApiKey') || '';
+
+        orders.innerHTML = '';
+
+        try {
+          const response = await fetch('/api/orders/summary?limit=10', {
+            cache: 'no-store',
+            headers: adminKey ? { authorization: `Bearer ${adminKey}` } : {},
+          });
+
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Debug API request failed.');
+          }
+
+          const data = await response.json();
+          summary.innerHTML = `
+            <div><span>Generated</span><strong>${data.generated_at}</strong></div>
+            <div><span>Orders returned</span><strong>${data.count}</strong></div>
+            <div><span>Source</span><strong>Cloudflare Function</strong></div>
+          `;
+
+          for (const order of data.orders) {
+            const row = order.financial_row;
+            const card = template.content.cloneNode(true);
+
+            card.querySelector('h2').textContent = `Order ${order.order_id}`;
+            card.querySelector('.muted').textContent = `${order.buyer_name || 'No buyer name'} | ${order.localidad || 'No city'} | ${order.date_created || 'No date'}`;
+            card.querySelector('.status-pill').textContent = order.status || 'unknown';
+
+            const metrics = card.querySelector('.metrics');
+            metrics.append(
+              metric('Pago', formatMoney(row.pago)),
+              metric('Recargo MP', formatMoney(row.recargo_mp)),
+              metric('IIBB', formatMoney(row.retencion_iibb)),
+              metric('SIRTAC', formatMoney(row.imp_sirtac)),
+              metric('Costo envio', formatMoney(row.costo_envio)),
+              metric('Neto', formatMoney(row.neto)),
+              metric('Validacion', formatMoney(row.validacion_neto)),
+            );
+
+            card.querySelector('pre').textContent = JSON.stringify(order.payments, null, 2);
+            orders.append(card);
+          }
+        } catch (error) {
+          summary.innerHTML = `
+            <div>
+              <span>Status</span>
+              <strong>${error.message}</strong>
+            </div>
+          `;
+        }
+      };
+
+      render();
+    </script>
+  </body>
+</html>

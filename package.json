@@ -5,6 +5,11 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "meli:auth-url": "node src/scripts/buildMeliAuthUrl.js",
+    "meli:exchange-code": "node src/scripts/exchangeMeliCode.js",
+    "meli:debug-export": "node src/scripts/exportMeliDebugSummary.js",
+    "frontend:dev": "node src/scripts/servePublic.js",
+    "cloudflare:seed-tokens": "node src/scripts/seedCloudflareKvTokens.js",
     "start": "node src/index.js"
   },
   "engines": {

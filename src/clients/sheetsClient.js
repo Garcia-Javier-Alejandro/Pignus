@@ -1,5 +1,11 @@
 import { google } from 'googleapis';
-import { config } from '../config/env.js';
+import { config, requireEnv } from '../config/env.js';
+
+requireEnv([
+  'GOOGLE_SHEET_ID',
+  'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+  'GOOGLE_PRIVATE_KEY',
+]);
 
 const auth = new google.auth.JWT({
   email: config.google.clientEmail,

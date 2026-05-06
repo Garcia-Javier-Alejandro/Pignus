@@ -30,7 +30,12 @@ Fill in these values:
 
 ```env
 MELI_ACCESS_TOKEN=your_mercado_libre_access_token
+MELI_REFRESH_TOKEN=your_mercado_libre_refresh_token
+MELI_TOKEN_EXPIRES_AT=2026-05-06T18:00:00.000Z
 MELI_SELLER_ID=your_seller_id
+MELI_APP_ID=your_app_id
+MELI_CLIENT_SECRET=your_client_secret
+MELI_REDIRECT_URI=https://pignus.pages.dev/api/auth/mercadolibre/callback/
 
 GOOGLE_SHEET_ID=your_spreadsheet_id
 GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
@@ -40,6 +45,7 @@ SHEET_NAME=Ventas
 MELI_PAGE_SIZE=50
 MELI_MAX_RETRIES=3
 LOG_RAW_PAYMENTS=false
+ADMIN_API_KEY=
 ```
 
 ### Mercado Libre
@@ -59,11 +65,39 @@ Authorization: Bearer <MELI_ACCESS_TOKEN>
 To get the token:
 
 1. Create an app in the Mercado Libre developer portal.
-2. Complete the OAuth authorization flow for your seller account.
+2. Complete the OAuth authorization flow for your seller account with `offline_access` scope.
 3. Store the resulting access token in `MELI_ACCESS_TOKEN`.
-4. Store your seller id in `MELI_SELLER_ID`.
+4. Store the resulting refresh token in `MELI_REFRESH_TOKEN`.
+5. Store your seller id in `MELI_SELLER_ID`.
+6. Store your app id and secret in `MELI_APP_ID` and `MELI_CLIENT_SECRET`.
 
-The script fetches all pages, keeps only paid orders, and retries temporary API failures.
+Use this authorization URL shape:
+
+```text
+https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=APP_ID&redirect_uri=https://pignus.pages.dev/api/auth/mercadolibre/callback/&scope=offline_access%20read%20write
+```
+
+Or generate it from your `.env`:
+
+```bash
+npm run meli:auth-url
+```
+
+After Mercado Libre redirects to the callback page, copy the `code` query parameter into `.env`:
+
+```env
+MELI_AUTH_CODE=TG-...
+```
+
+Then exchange it:
+
+```bash
+npm run meli:exchange-code
+```
+
+The script fetches all pages, keeps only paid orders, and retries temporary API failures. If `MELI_REFRESH_TOKEN` is configured, it refreshes the access token before expiry or after a 401 response, then writes the new single-use refresh token back to `.env`.
+
+Mercado Libre refresh tokens are single-use. Only the latest refresh token is valid, so do not reuse an older value from logs, shell history, or backups.
 
 ### Google Sheets
 
@@ -170,4 +204,75 @@ Production branch: main
 
 Cloudflare will deploy the contents of `public/` and give you a `*.pages.dev` domain. Every push to the production branch will trigger a new deployment.
 
-The callback page is static. It does not store secrets or exchange tokens; it only displays the temporary Mercado Libre `code` query parameter so you can copy it during the current manual setup.
+The callback route is now handled by a Cloudflare Pages Function. It exchanges the temporary Mercado Libre `code` server-side and stores the token bundle in Cloudflare KV.
+
+## Mercado Libre Debug Summary
+
+Do not call Mercado Libre directly from browser JavaScript because that would expose your OAuth tokens. The deployed debug frontend calls a Pages Function instead:
+
+```text
+/api/orders/summary
+```
+
+That Function reads Mercado Libre tokens from Cloudflare KV, refreshes them server-side when needed, and returns a sanitized order summary.
+
+For local mapping validation, you can still generate a sanitized snapshot:
+
+```bash
+npm run meli:debug-export
+```
+
+Then open:
+
+```text
+http://localhost:8788/debug/
+```
+
+Start the local static server with:
+
+```bash
+npm run frontend:dev
+```
+
+Or deploy the static frontend after generating the file if you intentionally want the snapshot visible in Cloudflare Pages. The generated data file is ignored by Git:
+
+```text
+public/debug/orders-summary.json
+```
+
+The debug page shows the transformed financial row plus raw payment fee details so we can validate `Recargo MP`, IIBB, SIRTAC, shipping cost, and net calculations before writing to Google Sheets.
+
+## Cloudflare KV Token Storage
+
+Production token storage uses Cloudflare KV:
+
+```text
+Binding: PIGNUS_TOKENS
+Key: meli_tokens
+```
+
+The KV namespace id is configured in `wrangler.toml`.
+
+Seed the current local `.env` tokens into KV:
+
+```bash
+npm run cloudflare:seed-tokens
+```
+
+The Pages Function secrets required in Cloudflare are:
+
+```text
+MELI_APP_ID
+MELI_CLIENT_SECRET
+MELI_REDIRECT_URI
+MELI_SELLER_ID
+ADMIN_API_KEY
+```
+
+`ADMIN_API_KEY` protects the debug API. Open `/debug/`, paste the value from your local `.env`, and click Save. The key is stored only in your browser local storage and sent as an `Authorization: Bearer ...` header.
+
+The deployed OAuth callback route is:
+
+```text
+https://pignus.pages.dev/api/auth/mercadolibre/callback
+```

@@ -54,6 +54,9 @@ h1 {
 }
 
 .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 28px;
 }
 
@@ -99,6 +102,146 @@ input {
   margin: 18px 0 0;
 }
 
+.debug-shell {
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 32px;
+}
+
+.debug-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.debug-header h1 {
+  font-size: 34px;
+}
+
+.debug-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 20px;
+}
+
+.debug-summary > div,
+.order-card {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgb(23 32 42 / 6%);
+}
+
+.debug-summary > div {
+  padding: 18px;
+}
+
+.debug-summary span,
+.metric span {
+  color: #647282;
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.debug-summary strong,
+.metric strong {
+  color: #17202a;
+  display: block;
+  font-size: 16px;
+}
+
+.orders {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-key-panel {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 18px;
+}
+
+.admin-key-panel > div {
+  display: flex;
+  gap: 10px;
+}
+
+.admin-key-panel input {
+  flex: 1;
+}
+
+.order-card {
+  padding: 20px;
+}
+
+.order-card__header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.order-card h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.muted {
+  color: #647282;
+  margin: 8px 0 0;
+}
+
+.status-pill {
+  background: #e9f5f1;
+  border-radius: 999px;
+  color: #246b59;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.metrics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 18px 0;
+}
+
+.metric {
+  background: #f6f7f9;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+details {
+  border-top: 1px solid #e5e9ef;
+  padding-top: 14px;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+pre {
+  background: #17202a;
+  border-radius: 6px;
+  color: #f6f7f9;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: auto;
+  padding: 16px;
+}
+
 @media (max-width: 640px) {
   .shell {
     align-items: stretch;
@@ -111,5 +254,23 @@ input {
 
   h1 {
     font-size: 30px;
+  }
+
+  .debug-shell {
+    padding: 16px;
+  }
+
+  .debug-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .debug-summary,
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-key-panel > div {
+    flex-direction: column;
   }
 }

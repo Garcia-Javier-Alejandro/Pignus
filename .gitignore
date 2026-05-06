@@ -1,3 +1,5 @@
 node_modules/
 .env
 npm-debug.log*
+public/debug/orders-summary.json
+.wrangler/

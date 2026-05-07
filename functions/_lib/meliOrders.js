@@ -99,71 +99,94 @@ export async function fetchAllPaidOrders(env) {
   return orders.filter(isPaidOrder);
 }
 
-// Fetch paid orders created within the last `days` days.
-// Probes total count first, then starts pagination near the tail so the most
-// recent orders are captured regardless of API sort order.
-export async function fetchRecentPaidOrders(env, days = 30) {
+// Fetch the most recent `count` paid orders.
+// Uses 2 fetches (1 probe + 1 page), reserving budget for per-order enrichment.
+export async function fetchRecentPaidOrders(env, count = 20) {
   const tokens = await getValidAccessToken(env);
   const sellerId = tokens.seller_id || env.MELI_SELLER_ID;
-  const dateFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // One cheap request to learn the total order count.
   const probe = await requestOrders({ seller: sellerId, limit: '1', offset: '0' }, tokens.access_token);
   const probeData = await probe.json();
   if (!probe.ok) throw new Error(probeData.message || probeData.error || 'Mercado Libre orders request failed');
 
   const total = probeData.paging?.total ?? 0;
-  const MAX_PAGES = 4;
-  let offset = Math.max(0, total - PAGE_SIZE * MAX_PAGES);
+  const offset = Math.max(0, total - count);
 
-  const orders = [];
+  const response = await requestOrders({
+    seller: sellerId,
+    limit: String(count),
+    offset: String(offset),
+  }, tokens.access_token);
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const response = await requestOrders({
-      seller: sellerId,
-      limit: String(PAGE_SIZE),
-      offset: String(offset),
-    }, tokens.access_token);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || data.error || 'Mercado Libre orders request failed');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'Mercado Libre orders request failed');
-    }
-
-    const results = data.results || [];
-    if (!results.length) break;
-
-    orders.push(...results);
-
-    if (results.length < PAGE_SIZE) break;
-    offset += results.length;
-  }
-
-  return orders
-    .filter(isPaidOrder)
-    .filter((o) => o.date_created && o.date_created >= dateFrom);
+  return (data.results || []).filter(isPaidOrder);
 }
 
-// Enrich orders with full detail (fee_details, receiver_address, buyer name).
-// Runs sequentially to stay under the 50 subrequest limit; capped at 40 orders.
-const ENRICH_LIMIT = 40;
+// Enrich orders with full detail. For each order: one call to GET /orders/{id}
+// (for buyer real name) and one call to GET /shipments/{id} (for city name).
+// Capped at 20 orders so total fetches stay at 5 + 20 + 20 = 45, under the 50 limit.
+const ENRICH_LIMIT = 20;
 
 export async function enrichOrders(orders, env) {
   const tokens = await getValidAccessToken(env);
   const enriched = [];
 
   for (const order of orders.slice(0, ENRICH_LIMIT)) {
-    const res = await fetch(`https://api.mercadolibre.com/orders/${order.id}`, {
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${tokens.access_token}`,
-      },
+    const orderRes = await fetch(`https://api.mercadolibre.com/orders/${order.id}`, {
+      headers: { accept: 'application/json', authorization: `Bearer ${tokens.access_token}` },
     });
-    enriched.push(res.ok ? await res.json() : order);
+    const fullOrder = orderRes.ok ? await orderRes.json() : order;
+
+    const shippingId = fullOrder.shipping?.id ?? order.shipping?.id;
+    if (shippingId) {
+      const shipRes = await fetch(`https://api.mercadolibre.com/shipments/${shippingId}`, {
+        headers: { accept: 'application/json', authorization: `Bearer ${tokens.access_token}` },
+      });
+      if (shipRes.ok) {
+        const shipData = await shipRes.json();
+        fullOrder.shipping = { ...fullOrder.shipping, receiver_address: shipData.receiver_address };
+      }
+    }
+
+    enriched.push(fullOrder);
   }
 
-  // Return enriched orders + unenriched remainder (IIBB/SIRTAC/Localidad will be
-  // empty for orders beyond the cap, but at least they appear in the table).
   return [...enriched, ...orders.slice(ENRICH_LIMIT)];
+}
+
+// Fetch IIBB and SIRTAC tax withholdings for a list of orders from the billing API.
+// One call covers all order IDs; fails gracefully (returns empty Map) on 429 or error.
+export async function fetchBillingTaxes(orders, env) {
+  const tokens = await getValidAccessToken(env);
+  const orderIds = orders.map((o) => o.id).join(',');
+
+  const res = await fetch(
+    `https://api.mercadolibre.com/billing/integration/group/ML/order/details?order_ids=${orderIds}`,
+    { headers: { accept: 'application/json', authorization: `Bearer ${tokens.access_token}` } },
+  );
+
+  if (!res.ok) return new Map();
+
+  const data = await res.json();
+  const taxes = new Map();
+
+  for (const item of data.results || []) {
+    let iibb = 0;
+    let sirtac = 0;
+
+    for (const payment of item.payment_info || []) {
+      for (const tax of payment.tax_details || []) {
+        if (tax.tax_status !== 'applied') continue;
+        const detail = (tax.mov_detail || '').toLowerCase();
+        if (detail.includes('iibb')) iibb += Number(tax.original_amount || 0);
+        else if (detail.includes('sirtac')) sirtac += Number(tax.original_amount || 0);
+      }
+    }
+
+    taxes.set(String(item.order_id), { iibb, sirtac });
+  }
+
+  return taxes;
 }

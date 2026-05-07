@@ -24,7 +24,7 @@
     <main class="main">
       <div class="toolbar">
         <button id="fetch-btn" type="button" class="btn btn--primary">
-          <span id="fetch-label">Fetch last 200 orders</span>
+          <span id="fetch-label">Fetch last 20 orders</span>
         </button>
         <button id="export-btn" type="button" class="btn btn--secondary" disabled>Append new entries to Google Sheet</button>
         <button id="open-btn" type="button" class="btn btn--ghost" disabled>Open Sheet ↗</button>
@@ -148,7 +148,7 @@
           setStatus(err.message, 'err');
         } finally {
           fetchBtn.disabled = false;
-          fetchLbl.textContent = 'Fetch last 200 orders';
+          fetchLbl.textContent = 'Fetch last 20 orders';
         }
       });
 

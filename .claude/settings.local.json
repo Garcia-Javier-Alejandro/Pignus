@@ -15,7 +15,9 @@
       "Bash(node *)",
       "PowerShell(Remove-Item *)",
       "WebSearch",
-      "WebFetch(domain:developers.mercadolibre.com.ar)"
+      "WebFetch(domain:developers.mercadolibre.com.ar)",
+      "Bash(Remove-Item \"C:\\\\dev\\\\git\\\\Pignus\\\\functions\\\\_worker.js\" -Force)",
+      "Bash(Write-Output \"Deleted\")"
     ]
   }
 }

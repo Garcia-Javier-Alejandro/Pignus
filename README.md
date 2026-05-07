@@ -113,21 +113,6 @@ Mercado Libre refresh tokens are single-use. Pignus refreshes tokens server-side
 7. Share the spreadsheet with the service account email as an editor.
 8. Make sure the tab is named `Ventas`, or change `SHEET_NAME`.
 
-## Scheduled Sync
-
-A Cloudflare Cron Trigger runs the sync daily at **06:00 UTC (03:00 Argentina time)**. On each run it:
-
-1. Fetches all paid orders from the Mercado Libre API using full pagination.
-2. Reads existing order IDs from column A of the sheet.
-3. Appends only the rows not already present.
-
-The cron schedule is defined in `wrangler.toml`:
-
-```toml
-[triggers]
-crons = ["0 6 * * *"]
-```
-
 ## Manual Export
 
 A protected endpoint is available for triggering a sync on demand:
@@ -137,7 +122,11 @@ POST /api/orders/export
 Authorization: Bearer <ADMIN_API_KEY>
 ```
 
-This runs the same sync logic as the scheduled cron.
+This is also what the Export button in the frontend calls.
+
+## Scheduled Sync
+
+Cloudflare Pages Functions do not support a `scheduled` event export directly in file-based routing mode. A daily cron is the intended approach (`0 6 * * *`, 06:00 UTC / 03:00 Argentina time) but requires Cloudflare Pages advanced mode (`_worker.js` entry point), which conflicts with the current file-based routing setup. The manual export endpoint above is the current way to trigger a sync.
 
 ## Cloudflare Deployment
 

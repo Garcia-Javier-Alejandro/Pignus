@@ -105,10 +105,27 @@ export async function fetchRecentPaidOrders(env, days = 30) {
   const sellerId = tokens.seller_id || env.MELI_SELLER_ID;
   const dateFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // Scroll pagination does not support date filters, so offset is used here.
-  const orders = await fetchWithOffset(sellerId, tokens.access_token, {
-    'date_created.from': dateFrom,
-  });
+  // The API date filter param is unreliable, so we fetch all and filter in code.
+  const orders = await fetchWithOffset(sellerId, tokens.access_token);
 
-  return orders.filter(isPaidOrder);
+  return orders
+    .filter(isPaidOrder)
+    .filter((o) => o.date_created && o.date_created >= dateFrom);
+}
+
+// Fetch full order detail (including payments[].fee_details) for a list of orders.
+// The search endpoint omits fee_details; individual order fetches include them.
+export async function enrichOrders(orders, env) {
+  const tokens = await getValidAccessToken(env);
+
+  return Promise.all(orders.map(async (order) => {
+    const res = await fetch(`https://api.mercadolibre.com/orders/${order.id}`, {
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    return res.ok ? res.json() : order;
+  }));
 }

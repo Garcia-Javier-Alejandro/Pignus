@@ -70,7 +70,7 @@ export function transformOrderToRow(order) {
   return [
     String(order.id || ''),
     order.date_created || '',
-    `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim(),
+    order.buyer?.nickname || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim(),
     pago,
     recargoMp,
     retencionIibb,

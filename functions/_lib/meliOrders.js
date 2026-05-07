@@ -112,20 +112,3 @@ export async function fetchRecentPaidOrders(env, days = 30) {
     .filter(isPaidOrder)
     .filter((o) => o.date_created && o.date_created >= dateFrom);
 }
-
-// Fetch full order detail (including payments[].fee_details) for a list of orders.
-// The search endpoint omits fee_details; individual order fetches include them.
-export async function enrichOrders(orders, env) {
-  const tokens = await getValidAccessToken(env);
-
-  return Promise.all(orders.map(async (order) => {
-    const res = await fetch(`https://api.mercadolibre.com/orders/${order.id}`, {
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${tokens.access_token}`,
-      },
-    });
-
-    return res.ok ? res.json() : order;
-  }));
-}

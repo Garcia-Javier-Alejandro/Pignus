@@ -13,6 +13,10 @@ export async function onRequestGet({ request, env }) {
     const recent = await fetchRecentPaidOrders(env, 20);
     recent.sort((a, b) => (b.date_created > a.date_created ? 1 : -1));
 
+    if (recent.length === 0) {
+      return json({ headers: OUTPUT_HEADERS, rows: [], _debug_orders: 'fetchRecentPaidOrders returned 0 — check probe/filter' });
+    }
+
     const orders = await enrichOrders(recent, env);
 
     // Fetch IIBB/SIRTAC for all orders in one billing API call, then inject per order.

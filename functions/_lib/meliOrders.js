@@ -99,16 +99,66 @@ export async function fetchAllPaidOrders(env) {
   return orders.filter(isPaidOrder);
 }
 
-// Fetch paid orders created within the last `days` days. Used by the preview endpoint.
+// Fetch paid orders created within the last `days` days. Stops pagination early once
+// orders older than the cutoff are encountered, keeping subrequest count low.
 export async function fetchRecentPaidOrders(env, days = 30) {
   const tokens = await getValidAccessToken(env);
   const sellerId = tokens.seller_id || env.MELI_SELLER_ID;
   const dateFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // The API date filter param is unreliable, so we fetch all and filter in code.
-  const orders = await fetchWithOffset(sellerId, tokens.access_token);
+  const orders = [];
+  let offset = 0;
+  const MAX_PAGES = 4; // 4 pages × 50 = 200 orders max; keeps subrequests ≤ 5
 
-  return orders
-    .filter(isPaidOrder)
-    .filter((o) => o.date_created && o.date_created >= dateFrom);
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const response = await requestOrders({
+      seller: sellerId,
+      limit: String(PAGE_SIZE),
+      offset: String(offset),
+    }, tokens.access_token);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || data.error || 'Mercado Libre orders request failed');
+    }
+
+    const results = data.results || [];
+    if (!results.length) break;
+
+    let reachedCutoff = false;
+    for (const order of results) {
+      if (order.date_created && order.date_created < dateFrom) {
+        reachedCutoff = true;
+        break;
+      }
+      orders.push(order);
+    }
+
+    if (reachedCutoff || results.length < PAGE_SIZE) break;
+    offset += results.length;
+  }
+
+  return orders.filter(isPaidOrder);
+}
+
+// Enrich orders with full detail (fee_details, receiver_address, buyer name).
+// Runs sequentially to stay under the 50 subrequest limit; capped at 40 orders.
+const ENRICH_LIMIT = 40;
+
+export async function enrichOrders(orders, env) {
+  const tokens = await getValidAccessToken(env);
+  const enriched = [];
+
+  for (const order of orders.slice(0, ENRICH_LIMIT)) {
+    const res = await fetch(`https://api.mercadolibre.com/orders/${order.id}`, {
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+    enriched.push(res.ok ? await res.json() : order);
+  }
+
+  return enriched;
 }

@@ -1,5 +1,5 @@
 import { errorResponse, json, requireAdmin } from '../../_lib/http.js';
-import { fetchRecentPaidOrders } from '../../_lib/meliOrders.js';
+import { enrichOrders, fetchRecentPaidOrders } from '../../_lib/meliOrders.js';
 import { OUTPUT_HEADERS, transformOrdersToRows } from '../../_lib/transform.js';
 
 export async function onRequestGet({ request, env }) {
@@ -10,7 +10,12 @@ export async function onRequestGet({ request, env }) {
   }
 
   try {
-    const orders = await fetchRecentPaidOrders(env, 30);
+    const recent = await fetchRecentPaidOrders(env, 30);
+
+    // Sort newest first before enriching so the cap keeps the most recent orders.
+    recent.sort((a, b) => (b.date_created > a.date_created ? 1 : -1));
+
+    const orders = await enrichOrders(recent, env);
     const rows = transformOrdersToRows(orders);
 
     return json({ headers: OUTPUT_HEADERS, rows });

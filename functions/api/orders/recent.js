@@ -14,7 +14,7 @@ export async function onRequestGet({ request, env }) {
     recent.sort((a, b) => (b.date_created > a.date_created ? 1 : -1));
 
     if (recent.length === 0) {
-      return json({ headers: OUTPUT_HEADERS, rows: [], _debug_orders: 'fetchRecentPaidOrders returned 0 — check probe/filter' });
+      return json({ headers: OUTPUT_HEADERS, rows: [], _debug_orders: recent._debug });
     }
 
     const orders = await enrichOrders(recent, env);

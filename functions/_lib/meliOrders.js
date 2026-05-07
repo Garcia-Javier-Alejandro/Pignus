@@ -121,7 +121,13 @@ export async function fetchRecentPaidOrders(env, count = 20) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || data.error || 'Mercado Libre orders request failed');
 
-  return (data.results || []).filter(isPaidOrder);
+  const results = data.results || [];
+  const paid = results.filter(isPaidOrder);
+
+  // Attach debug info so callers can surface it when count is 0.
+  paid._debug = { probe_total: total, raw_count: results.length, paid_count: paid.length, statuses: results.map((o) => o.status) };
+
+  return paid;
 }
 
 // Enrich orders with full detail. For each order: one call to GET /orders/{id}

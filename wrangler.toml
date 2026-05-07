@@ -2,6 +2,9 @@ name = "pignus"
 pages_build_output_dir = "public"
 compatibility_date = "2026-05-06"
 
+[triggers]
+crons = ["0 6 * * *"]
+
 [[kv_namespaces]]
 binding = "PIGNUS_TOKENS"
 id = "547a6a10d4004fc58410e0d7226f65be"

@@ -13,7 +13,9 @@
       "Bash(node -r dotenv/config -e \"process.stdout.write\\(process.env.SHEET_NAME || ''\\)\")",
       "Bash(npm run *)",
       "Bash(node *)",
-      "PowerShell(Remove-Item *)"
+      "PowerShell(Remove-Item *)",
+      "WebSearch",
+      "WebFetch(domain:developers.mercadolibre.com.ar)"
     ]
   }
 }

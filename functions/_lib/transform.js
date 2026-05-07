@@ -12,7 +12,6 @@ export const OUTPUT_HEADERS = [
   'Costo Envio',
   'Neto',
   'Localidad',
-  'Validacion Neto',
 ];
 
 const getFeeAmount = (fee) => toNumber(fee.amount ?? fee.fee_amount);
@@ -66,7 +65,6 @@ export function transformOrderToRow(order) {
   const retencionIibb = sumFeeDetails(payments, isIibbFee);
   const impSirtac = sumFeeDetails(payments, isSirtacFee);
   const costoEnvio = sumPaymentsField(payments, 'shipping_cost') || toNumber(order.shipping?.cost);
-  const netReceivedAmount = sumPaymentsField(payments, 'net_received_amount');
   const neto = pago - (recargoMp + retencionIibb + impSirtac + costoEnvio);
 
   return [
@@ -80,55 +78,9 @@ export function transformOrderToRow(order) {
     costoEnvio,
     neto,
     order.shipping?.receiver_address?.city?.name || '',
-    neto - netReceivedAmount,
   ];
 }
 
 export function transformOrdersToRows(orders) {
   return orders.map(transformOrderToRow);
-}
-
-export function summarizeOrder(order) {
-  const row = transformOrderToRow(order);
-  const payments = order.payments || [];
-  const netReceivedAmount = sumPaymentsField(payments, 'net_received_amount');
-
-  return {
-    order_id: row[0],
-    date_created: order.date_created,
-    status: order.status,
-    buyer_name: row[2],
-    localidad: row[9],
-    payments_count: payments.length,
-    fee_details_count: payments.reduce((total, payment) => total + (payment.fee_details || []).length, 0),
-    financial_row: {
-      orden_id: row[0],
-      fecha: row[1],
-      nombre: row[2],
-      pago: row[3],
-      recargo_mp: row[4],
-      retencion_iibb: row[5],
-      imp_sirtac: row[6],
-      costo_envio: row[7],
-      neto: row[8],
-      localidad: row[9],
-      net_received_amount: netReceivedAmount,
-      validacion_neto: row[10],
-    },
-    payments: payments.map((payment) => ({
-      status: payment.status,
-      payment_type: payment.payment_type,
-      payment_method_id: payment.payment_method_id,
-      transaction_amount: payment.transaction_amount,
-      total_paid_amount: payment.total_paid_amount,
-      shipping_cost: payment.shipping_cost,
-      net_received_amount: payment.net_received_amount,
-      fee_details: (payment.fee_details || []).map((fee) => ({
-        type: fee.type,
-        name: fee.name,
-        description: fee.description,
-        amount: fee.amount ?? fee.fee_amount,
-      })),
-    })),
-  };
 }

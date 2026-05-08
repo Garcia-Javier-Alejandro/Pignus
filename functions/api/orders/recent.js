@@ -1,3 +1,4 @@
+// recent orders endpoint
 import { errorResponse, json, requireAdmin } from '../../_lib/http.js';
 import { enrichOrders, fetchBillingTaxes, fetchRecentPaidOrders } from '../../_lib/meliOrders.js';
 import { OUTPUT_HEADERS, transformOrdersToRows } from '../../_lib/transform.js';

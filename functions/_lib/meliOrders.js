@@ -125,7 +125,7 @@ export async function fetchRecentPaidOrders(env, count = 20) {
   const paid = results.filter(isPaidOrder);
 
   // Attach debug info so callers can surface it when count is 0.
-  paid._debug = { probe_total: total, raw_count: results.length, paid_count: paid.length, statuses: results.map((o) => o.status) };
+  paid._debug = { probe_total: total, raw_count: results.length, paid_count: paid.length, statuses: results.map((o) => o.status), probe_raw: probeData };
 
   return paid;
 }

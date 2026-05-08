@@ -1,9 +1,4 @@
-import { requireAdmin } from '../../_lib/http.js';
-
-export async function onRequestGet({ request, env }) {
-  const authError = await requireAdmin(request, env);
-  if (authError) return authError;
-
+export async function onRequestGet({ env }) {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: env.MELI_APP_ID,

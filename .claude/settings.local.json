@@ -18,7 +18,10 @@
       "WebFetch(domain:developers.mercadolibre.com.ar)",
       "Bash(Remove-Item \"C:\\\\dev\\\\git\\\\Pignus\\\\functions\\\\_worker.js\" -Force)",
       "Bash(Write-Output \"Deleted\")",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(New-Item -ItemType Directory -Path \"C:\\\\dev\\\\git\\\\Pignus\\\\functions\\\\api\\\\meli\" -Force)",
+      "Bash(Out-Null)",
+      "PowerShell(New-Item *)"
     ]
   }
 }

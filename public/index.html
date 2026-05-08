@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pignus-Meli</title>
+    <title>Pignus-Facturación</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital@0;1&display=swap" rel="stylesheet">
@@ -23,20 +23,33 @@
         <button id="fetch-btn" type="button" class="btn btn--primary">
           <span id="fetch-label">Fetch last 20 orders</span>
         </button>
+        <button id="import-btn" type="button" class="btn btn--secondary">Import 2026 history ↓</button>
         <button id="export-btn" type="button" class="btn btn--secondary" disabled>Append new entries to Google Sheet</button>
         <button id="open-btn" type="button" class="btn btn--ghost" disabled>Open Sheet ↗</button>
         <p id="status" class="status" aria-live="polite"></p>
       </div>
 
-      <div hidden id="auth-section" style="margin-top:1rem">
-        <button id="auth-btn" type="button" class="btn btn--ghost">Re-authorize ML ↗</button>
+      <div class="meta-bar" id="meta-bar">
+        <span id="meta-count">—</span>
+        <span class="meta-sep">·</span>
+        <span id="meta-oldest">Más antigua: —</span>
+        <span class="meta-sep">·</span>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-bar__fill" id="progress-fill" style="width:0%"></div></div>
+          <span id="progress-text">0%</span>
+          <span class="progress-label">de 2026</span>
+        </div>
       </div>
 
-      <section id="table-section" hidden>
+      <section id="table-section">
         <div class="table-wrap">
           <table id="orders-table" class="orders-table"></table>
         </div>
       </section>
+
+      <div hidden id="auth-section" style="margin-top:1rem">
+        <button id="auth-btn" type="button" class="btn btn--ghost">Re-authorize ML ↗</button>
+      </div>
     </main>
 
     <footer class="footer">
@@ -45,6 +58,7 @@
 
     <script>
       const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Z6Z8UBOw8gkz77oz8M3L7CXlxt5ar146A3-n9EJLEDw';
+      const HISTORY_CUTOFF = new Date('2026-01-01T00:00:00');
       const MONEY_COLS = new Set(['Pago', 'Recargo MP', 'Retencion IIBB', 'Imp SIRTAC', 'Costo Envio', 'Neto']);
 
       const ars = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
@@ -56,16 +70,31 @@
         return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
       };
 
+      const calcProgress = (oldestDateStr) => {
+        if (!oldestDateStr) return 0;
+        const oldest = new Date(oldestDateStr);
+        const now = new Date();
+        const total = now - HISTORY_CUTOFF;
+        const covered = now - oldest;
+        return Math.min(100, Math.max(0, Math.round((covered / total) * 100)));
+      };
+
       const $ = (id) => document.getElementById(id);
 
       const keyInput     = $('admin-key');
       const fetchBtn     = $('fetch-btn');
       const fetchLbl     = $('fetch-label');
+      const importBtn    = $('import-btn');
       const tableSection = $('table-section');
       const table        = $('orders-table');
       const exportBtn    = $('export-btn');
       const openBtn      = $('open-btn');
       const statusEl     = $('status');
+      const metaBar      = $('meta-bar');
+      const metaCount    = $('meta-count');
+      const metaOldest   = $('meta-oldest');
+      const progressFill = $('progress-fill');
+      const progressText = $('progress-text');
 
       keyInput.value = localStorage.getItem('pignus.adminApiKey') || '';
 
@@ -84,6 +113,19 @@
         setStatus('Key saved.', 'ok');
       });
 
+      const updateMeta = (meta) => {
+        if (!meta) return;
+        const pct = calcProgress(meta.oldest_date);
+        metaCount.textContent = `${meta.loaded} órdenes`;
+        metaOldest.textContent = `Más antigua: ${formatDate(meta.oldest_date) || '—'}`;
+        progressFill.style.width = `${pct}%`;
+        progressText.textContent = `${pct}%`;
+        if (meta.done && !importRunning) {
+          importBtn.textContent = 'Historia completa ✓';
+          importBtn.disabled = true;
+        }
+      };
+
       const renderTable = ({ headers, rows }) => {
         table.innerHTML = '';
 
@@ -99,7 +141,6 @@
         table.append(thead);
 
         const tbody = document.createElement('tbody');
-
         if (rows.length === 0) {
           const tr = document.createElement('tr');
           const td = document.createElement('td');
@@ -127,16 +168,27 @@
             tbody.append(tr);
           }
         }
-
         table.append(tbody);
       };
+
+      // Load cache on page load if key is already saved
+      if (localStorage.getItem('pignus.adminApiKey')) {
+        fetch('/api/orders/cache', { headers: authHeader() })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.headers) {
+              renderTable(data);
+              exportBtn.disabled = false;
+              openBtn.disabled = false;
+              updateMeta(data.meta);
+            }
+          })
+          .catch(() => {});
+      }
 
       fetchBtn.addEventListener('click', async () => {
         fetchBtn.disabled = true;
         fetchLbl.textContent = 'Fetching…';
-        tableSection.hidden = true;
-        exportBtn.disabled = true;
-        openBtn.disabled = true;
         setStatus('Loading orders…');
 
         try {
@@ -144,10 +196,10 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Request failed.');
           renderTable(data);
-          tableSection.hidden = false;
           exportBtn.disabled = false;
           openBtn.disabled = false;
-          const n = data.rows.length;
+          updateMeta(data.meta);
+          const n = data.meta?.loaded ?? data.rows.length;
           setStatus(`${n} order${n !== 1 ? 's' : ''} loaded.`, 'ok');
         } catch (err) {
           setStatus(err.message, 'err');
@@ -157,15 +209,51 @@
         }
       });
 
+      let importRunning = false;
+
+      importBtn.addEventListener('click', async () => {
+        if (importRunning) {
+          importRunning = false;
+          importBtn.textContent = 'Import 2026 history ↓';
+          setStatus('Import stopped.', '');
+          return;
+        }
+
+        importRunning = true;
+        importBtn.textContent = 'Detener ✕';
+        setStatus('Importing history…');
+
+        while (importRunning) {
+          try {
+            const res = await fetch('/api/orders/older', { headers: authHeader() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error loading older orders.');
+            renderTable(data);
+            exportBtn.disabled = false;
+            openBtn.disabled = false;
+            updateMeta(data.meta);
+            setStatus(`Importing… ${data.meta.loaded} orders — oldest: ${formatDate(data.meta.oldest_date)}`);
+            if (data.meta.done) {
+              setStatus('Historia importada hasta 01/01/2026.', 'ok');
+              importRunning = false;
+              break;
+            }
+            await new Promise((r) => setTimeout(r, 2000));
+          } catch (err) {
+            setStatus(err.message, 'err');
+            importRunning = false;
+            break;
+          }
+        }
+
+        if (!importRunning) importBtn.textContent = 'Import 2026 history ↓';
+      });
+
       exportBtn.addEventListener('click', async () => {
         exportBtn.disabled = true;
         setStatus('Appending new entries to Google Sheet…');
-
         try {
-          const res = await fetch('/api/orders/export', {
-            method: 'POST',
-            headers: authHeader(),
-          });
+          const res = await fetch('/api/orders/export', { method: 'POST', headers: authHeader() });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Export failed.');
           setStatus(`Appended ${data.exported_rows} new rows. ${data.skipped_existing} already present.`, 'ok');
@@ -178,7 +266,7 @@
 
       openBtn.addEventListener('click', () => window.open(SHEET_URL, '_blank'));
 
-      $('auth-btn').addEventListener('click', () => window.location.href = '/api/meli/login');
+      $('auth-btn').addEventListener('click', () => { window.location.href = '/api/meli/login'; });
     </script>
   </body>
 </html>

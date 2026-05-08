@@ -3,6 +3,7 @@ export function json(data, init = {}) {
     ...init,
     headers: {
       'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
       ...(init.headers || {}),
     },
   });

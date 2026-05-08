@@ -15,7 +15,12 @@ export async function onRequestGet({ request, env }) {
     recent.sort((a, b) => (b.date_created > a.date_created ? 1 : -1));
 
     if (recent.length === 0) {
-      return json({ headers: OUTPUT_HEADERS, rows: [], _debug_orders: recent._debug });
+      const { access_token } = await (await import('../../_lib/meliAuth.js')).getStoredTokens(env);
+      const meRes = await fetch('https://api.mercadolibre.com/users/me', {
+        headers: { accept: 'application/json', authorization: `Bearer ${access_token}` },
+      });
+      const meData = await meRes.json();
+      return json({ headers: OUTPUT_HEADERS, rows: [], _debug_orders: recent._debug, _debug_me: { status: meRes.status, id: meData.id, nickname: meData.nickname, seller_reputation: meData.seller_reputation?.level_id } });
     }
 
     const orders = await enrichOrders(recent, env);

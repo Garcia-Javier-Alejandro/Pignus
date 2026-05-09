@@ -153,9 +153,8 @@ export async function enrichOrders(orders, env) {
   return [...enriched, ...orders.slice(ENRICH_LIMIT)];
 }
 
-export async function fetchFiscalDate(packId, orderId, accessToken, sellerId = null) {
+export async function fetchFiscalDate(packId, orderId, accessToken) {
   const paths = [`packs/${packId || orderId}/fiscal_documents`];
-  if (sellerId) paths.push(`users/${sellerId}/invoices/orders/${orderId}`);
 
   for (const path of paths) {
     const res = await fetch(`https://api.mercadolibre.com/${path}`, {
@@ -163,7 +162,7 @@ export async function fetchFiscalDate(packId, orderId, accessToken, sellerId = n
     });
     if (!res.ok) continue;
     const data = await res.json();
-    const items = Array.isArray(data) ? data : (data.results ?? [data]);
+    const items = Array.isArray(data) ? data : (data.fiscal_documents ?? data.results ?? [data]);
     for (const doc of items) {
       if (!doc || typeof doc !== 'object') continue;
       const date = doc.date ?? doc.fiscal_date ?? doc.date_created ?? doc.issue_date ?? null;

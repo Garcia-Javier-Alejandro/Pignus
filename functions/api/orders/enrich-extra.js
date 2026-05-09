@@ -52,7 +52,7 @@ export async function onRequestGet({ env, request }) {
           order._fecha_factura = sibling?._fecha_factura ?? null;
         } else {
           if (packId) seenPacks.add(packId);
-          order._fecha_factura = await fetchFiscalDate(order.pack_id, order.id, access_token, sellerId) ?? null;
+          order._fecha_factura = await fetchFiscalDate(order.pack_id, order.id, access_token) ?? null;
           if (packId) {
             for (const o of cache.orders) {
               if (String(o.pack_id) === packId && o._fecha_factura === undefined) {

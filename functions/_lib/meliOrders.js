@@ -154,10 +154,8 @@ export async function enrichOrders(orders, env) {
 }
 
 export async function fetchFiscalDate(packId, orderId, accessToken, sellerId = null) {
-  const paths = [];
-  if (packId) paths.push(`packs/${packId}/fiscal_documents`);
+  const paths = [`packs/${packId || orderId}/fiscal_documents`];
   if (sellerId) paths.push(`users/${sellerId}/invoices/orders/${orderId}`);
-  paths.push(`orders/${orderId}/fiscal_documents`);
 
   for (const path of paths) {
     const res = await fetch(`https://api.mercadolibre.com/${path}`, {

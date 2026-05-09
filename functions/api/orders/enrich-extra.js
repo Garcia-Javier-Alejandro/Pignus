@@ -19,10 +19,8 @@ export async function onRequestGet({ env, request }) {
     const cache = await getOrdersCache(env);
     const order = cache.orders.find((o) => String(o.id) === String(probeId));
     const packId = order?.pack_id ? String(order.pack_id) : null;
-    const paths = [];
-    if (packId) paths.push(`packs/${packId}/fiscal_documents`);
+    const paths = [`packs/${packId || probeId}/fiscal_documents`];
     if (sellerId) paths.push(`users/${sellerId}/invoices/orders/${probeId}`);
-    paths.push(`orders/${probeId}/fiscal_documents`);
     const results = {};
     for (const path of paths) {
       const res = await fetch(`https://api.mercadolibre.com/${path}`, {

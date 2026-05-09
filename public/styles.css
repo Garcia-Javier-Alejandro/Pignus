@@ -206,7 +206,7 @@ input[type="password"]:focus { border-color: var(--border-mid); }
 .table-wrap {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 78vh;
+  max-height: 31.5rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   scrollbar-width: auto;

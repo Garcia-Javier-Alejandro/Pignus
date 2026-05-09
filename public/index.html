@@ -28,7 +28,7 @@
         <p id="status" class="status" aria-live="polite"></p>
         <div class="toolbar-right">
           <button id="fetch-btn" type="button" class="btn btn--primary">
-            <span id="fetch-label">Cargar últimos pedidos</span>
+            <span id="fetch-label">+ Cargar últimos pedidos</span>
           </button>
           <button id="import-btn" type="button" class="btn btn--secondary">Import 2026 history ↓</button>
           <button id="export-btn" type="button" class="btn btn--secondary" disabled>Añadir a Sheets</button>
@@ -46,7 +46,7 @@
           <span id="progress-text">0%</span>
           <span class="progress-label">de 2026</span>
         </div>
-        <button id="expand-btn" type="button" class="btn btn--ghost btn--expand">Expandir ∨</button>
+        <button id="expand-btn" type="button" class="btn btn--ghost btn--expand">Expandir →</button>
       </div>
 
       <section id="table-section">
@@ -363,7 +363,7 @@
       // ── Expand / collapse columns ─────────────────────────────────────────
       expandBtn.addEventListener('click', () => {
         isExpanded = !isExpanded;
-        expandBtn.textContent = isExpanded ? 'Colapsar ∧' : 'Expandir ∨';
+        expandBtn.textContent = isExpanded ? 'Colapsar ←' : 'Expandir →';
         table.querySelector('tr.edit-row')?.remove();
         if (lastHeaders.length) renderTable({ headers: lastHeaders, rows: lastFetchedRows });
       });

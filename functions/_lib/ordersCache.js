@@ -85,7 +85,9 @@ export function mergeIntoCache(cache, { newOrders, total, fetchedOffset, isOlder
 }
 
 export function isCacheDone(cache) {
-  if (cache.next_older_offset !== null && cache.next_older_offset < 0) return true;
+  // ≤ -20 means we've completed a fetch starting at offset 0 (0 - 20 = -20).
+  // Using < 0 fired too early when total orders < 40 (initial fetch offset < 20).
+  if (cache.next_older_offset !== null && cache.next_older_offset <= -20) return true;
   if (cache.oldest_date && cache.oldest_date < HISTORY_CUTOFF) return true;
   return false;
 }

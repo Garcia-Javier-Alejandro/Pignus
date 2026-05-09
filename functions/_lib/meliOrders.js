@@ -131,7 +131,9 @@ export async function enrichOrders(orders, env) {
         fullOrder.shipping = {
           ...fullOrder.shipping,
           receiver_address: shipData.receiver_address,
-          _state: shipData.destination?.shipping_address?.state,
+          _state: shipData.destination?.shipping_address?.state
+               ?? shipData.destination?.receiver_address?.state
+               ?? null,
         };
       }
     }
@@ -141,14 +143,24 @@ export async function enrichOrders(orders, env) {
 }
 
 export async function fetchFiscalDate(packId, orderId, accessToken) {
-  const path = packId ? `packs/${packId}` : `orders/${orderId}`;
-  const res = await fetch(`https://api.mercadolibre.com/${path}/fiscal_documents`, {
-    headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const docs = Array.isArray(data) ? data : (data.results || []);
-  return docs[0]?.date ?? null;
+  // Try pack endpoint first, fall back to order endpoint
+  const paths = packId
+    ? [`packs/${packId}/fiscal_documents`, `orders/${orderId}/fiscal_documents`]
+    : [`orders/${orderId}/fiscal_documents`];
+
+  for (const path of paths) {
+    const res = await fetch(`https://api.mercadolibre.com/${path}`, {
+      headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) continue;
+    const data = await res.json();
+    const docs = Array.isArray(data) ? data : (data.results || []);
+    const doc = docs[0];
+    if (!doc) continue;
+    const date = doc.date ?? doc.fiscal_date ?? doc.date_created ?? doc.issue_date ?? null;
+    if (date) return date;
+  }
+  return null;
 }
 
 export async function fetchCouponAmount(orderId, accessToken) {

@@ -1,4 +1,5 @@
 const toNumber = (value) => Number(value || 0);
+const nameOf = (v) => (typeof v === 'string' ? v : v?.name) || '';
 
 export const OUTPUT_HEADERS = [
   'Orden ID',
@@ -56,8 +57,8 @@ export function transformOrderToRow(order) {
     sumaImpuestos,
     costoEnvio,
     neto,
-    order.shipping?.receiver_address?.city?.name || '',
-    order.shipping?._state?.name || '',
+    nameOf(order.shipping?.receiver_address?.city),
+    nameOf(order.shipping?._state),
     'ML',
     order._fecha_factura || '',
     toNumber(order._cupon),

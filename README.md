@@ -54,22 +54,42 @@ functions/
       login.js      GET  /api/meli/login        → ML OAuth redirect
       callback.js   GET  /api/meli/callback      → exchange code, store tokens
     orders/
-      cache.js      GET  /api/orders/cache       → load KV cache, return table
-      recent.js     GET  /api/orders/recent      → fetch latest ~20, enrich, cache
-      older.js      GET  /api/orders/older       → fetch next older batch, enrich, cache
-      export.js     POST /api/orders/export      → append new rows to Google Sheet
+      cache.js      GET/DELETE /api/orders/cache  → load or wipe KV order cache
+      recent.js     GET  /api/orders/recent       → fetch latest ~20, enrich, cache
+      older.js      GET  /api/orders/older        → fetch next older batch, enrich, cache
+      export.js     POST /api/orders/export       → append new rows to Google Sheet
+  edits.js          GET/POST /api/edits           → read or write manual edits state
 ```
 
-## KV Cache
+## KV — Source of Truth
 
-The `PIGNUS_TOKENS` KV namespace stores two keys:
+**Cloudflare KV (`PIGNUS_TOKENS`) is the single source of truth for all application data.** Nothing meaningful is stored client-side.
 
 | Key | Contents |
 |---|---|
 | `meli_tokens` | OAuth access + refresh token bundle |
-| `orders_cache` | Slim order objects, seen IDs, pagination offset, oldest date |
+| `orders_cache` | Slim ML order objects, seen IDs, pagination offset, oldest date |
+| `edits` | Manual rows added by the user, hidden ML row IDs, ML row overrides |
 
-The cache is built incrementally. "Import 2026 history" fetches batches of 20 orders going backwards from the oldest cached order, stopping when `oldest_date < 2026-01-01` or `next_older_offset < 0`.
+On page load the frontend fetches `orders_cache` and `edits` in parallel before rendering.
+
+The order cache is built incrementally. "Import 2026 history" fetches batches of 20 orders going backwards from the oldest cached order, stopping when `oldest_date < 2026-01-01` or `next_older_offset < 0`.
+
+### Resetting state
+
+To wipe everything and start fresh (dev/recovery only — no UI button):
+
+```bash
+# Clear ML orders cache
+curl -X DELETE https://pignus.pages.dev/api/orders/cache \
+  -H "Authorization: Bearer <ADMIN_API_KEY>"
+
+# Clear manual edits (manual rows, hidden IDs, overrides)
+curl -X POST https://pignus.pages.dev/api/edits \
+  -H "Authorization: Bearer <ADMIN_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"manualRows":[],"hiddenIds":[],"mlOverrides":{}}'
+```
 
 ## Requirements
 

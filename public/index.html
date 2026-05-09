@@ -162,17 +162,23 @@
         }
       };
 
-      // ── localStorage helpers ──────────────────────────────────────────────
-      const MANUAL_KEY    = 'pignus.manualRows';
-      const HIDDEN_KEY    = 'pignus.hiddenIds';
-      const OVERRIDES_KEY = 'pignus.mlOverrides';
+      // ── Edits state — in-memory mirror of KV "edits" key ─────────────────
+      let editsState = { manualRows: [], hiddenIds: [], mlOverrides: {} };
 
-      const getManualRows   = () => JSON.parse(localStorage.getItem(MANUAL_KEY) || '[]');
-      const saveManualRows  = (rows) => localStorage.setItem(MANUAL_KEY, JSON.stringify(rows));
-      const getHiddenIds    = () => new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'));
-      const saveHiddenIds   = (set) => localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set]));
-      const getMlOverrides  = () => JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}');
-      const saveMlOverrides = (obj) => localStorage.setItem(OVERRIDES_KEY, JSON.stringify(obj));
+      const getManualRows  = () => editsState.manualRows;
+      const getHiddenIds   = () => new Set(editsState.hiddenIds);
+      const getMlOverrides = () => editsState.mlOverrides;
+
+      const persistEdits = () =>
+        fetch('/api/edits', {
+          method: 'POST',
+          headers: { ...authHeader(), 'content-type': 'application/json' },
+          body: JSON.stringify(editsState),
+        }).catch(() => setStatus('Error al guardar cambios.', 'err'));
+
+      const saveManualRows = (rows) => { editsState.manualRows = rows; persistEdits(); };
+      const saveHiddenIds  = (set)  => { editsState.hiddenIds  = [...set]; persistEdits(); };
+      const saveMlOverrides = (obj) => { editsState.mlOverrides = obj; persistEdits(); };
 
       // ── Table rendering ───────────────────────────────────────────────────
       let lastHeaders = [];
@@ -481,12 +487,17 @@
         updateMeta(data.meta);
       };
 
-      // Load cache on page load if key is already saved
+      // Load cache + edits from KV on page load
       if (localStorage.getItem('pignus.adminApiKey')) {
-        fetch('/api/orders/cache', { headers: authHeader() })
-          .then((r) => r.json())
-          .then((data) => { if (data.headers) applyData(data); })
-          .catch(() => {});
+        Promise.all([
+          fetch('/api/orders/cache', { headers: authHeader() }).then((r) => r.json()),
+          fetch('/api/edits',        { headers: authHeader() }).then((r) => r.json()),
+        ]).then(([cacheData, editsData]) => {
+          editsState.manualRows  = editsData.manualRows  || [];
+          editsState.hiddenIds   = editsData.hiddenIds   || [];
+          editsState.mlOverrides = editsData.mlOverrides || {};
+          if (cacheData.headers) applyData(cacheData);
+        }).catch(() => {});
       }
 
       fetchBtn.addEventListener('click', async () => {

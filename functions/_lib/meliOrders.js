@@ -153,11 +153,11 @@ export async function enrichOrders(orders, env) {
   return [...enriched, ...orders.slice(ENRICH_LIMIT)];
 }
 
-export async function fetchFiscalDate(packId, orderId, accessToken) {
-  // Try pack endpoint first, fall back to order endpoint
-  const paths = packId
-    ? [`packs/${packId}/fiscal_documents`, `orders/${orderId}/fiscal_documents`]
-    : [`orders/${orderId}/fiscal_documents`];
+export async function fetchFiscalDate(packId, orderId, accessToken, sellerId = null) {
+  const paths = [];
+  if (packId) paths.push(`packs/${packId}/fiscal_documents`);
+  if (sellerId) paths.push(`users/${sellerId}/invoices/orders/${orderId}`);
+  paths.push(`orders/${orderId}/fiscal_documents`);
 
   for (const path of paths) {
     const res = await fetch(`https://api.mercadolibre.com/${path}`, {
@@ -165,11 +165,12 @@ export async function fetchFiscalDate(packId, orderId, accessToken) {
     });
     if (!res.ok) continue;
     const data = await res.json();
-    const docs = Array.isArray(data) ? data : (data.results || []);
-    const doc = docs[0];
-    if (!doc) continue;
-    const date = doc.date ?? doc.fiscal_date ?? doc.date_created ?? doc.issue_date ?? null;
-    if (date) return date;
+    const items = Array.isArray(data) ? data : (data.results ?? [data]);
+    for (const doc of items) {
+      if (!doc || typeof doc !== 'object') continue;
+      const date = doc.date ?? doc.fiscal_date ?? doc.date_created ?? doc.issue_date ?? null;
+      if (date) return date;
+    }
   }
   return null;
 }

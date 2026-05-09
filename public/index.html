@@ -60,6 +60,7 @@
         <div class="debug-body">
           <button id="clear-cache-btn" type="button" class="btn btn--danger">✕ Limpiar caché</button>
           <span id="clear-cache-status" class="debug-status"></span>
+          <button id="stop-import-btn" type="button" class="btn btn--danger" disabled>⏹ Detener importación</button>
         </div>
       </details>
 
@@ -119,8 +120,9 @@
       const editBtn       = $('edit-btn');
       const deleteBtn     = $('delete-btn');
       const expandBtn     = $('expand-btn');
-      const clearCacheBtn = $('clear-cache-btn');
-      const clearCacheSt  = $('clear-cache-status');
+      const clearCacheBtn  = $('clear-cache-btn');
+      const clearCacheSt   = $('clear-cache-status');
+      const stopImportBtn  = $('stop-import-btn');
       const table     = $('orders-table');
       const exportBtn     = $('export-btn');
       const openBtn       = $('open-btn');
@@ -561,17 +563,28 @@
       });
 
       let importRunning = false;
+      let importCompletedNaturally = false;
+
+      const stopImport = () => {
+        importRunning = false;
+        stopImportBtn.disabled = true;
+        importBtn.textContent = 'Importar historial 2026';
+      };
+
+      stopImportBtn.addEventListener('click', () => {
+        if (importRunning) {
+          stopImport();
+          setStatus('Importación detenida.', '');
+        }
+      });
 
       importBtn.addEventListener('click', async () => {
-        if (importRunning) {
-          importRunning = false;
-          importBtn.textContent = 'Import 2026 history ↓';
-          setStatus('Import stopped.', '');
-          return;
-        }
+        if (importRunning) { stopImport(); setStatus('Importación detenida.', ''); return; }
         importRunning = true;
+        importCompletedNaturally = false;
+        stopImportBtn.disabled = false;
         importBtn.textContent = 'Detener ✕';
-        setStatus('Importing history…');
+        setStatus('Importando historial…');
 
         while (importRunning) {
           try {
@@ -579,8 +592,9 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Error loading older orders.');
             applyData(data);
-            setStatus(`Importando… ${data.meta.loaded} orders — oldest: ${formatDate(data.meta.oldest_date)}`);
+            setStatus(`Importando… ${data.meta.loaded} órdenes — más antigua: ${formatDate(data.meta.oldest_date)}`);
             if (data.meta.done) {
+              importCompletedNaturally = true;
               importRunning = false;
               break;
             }
@@ -592,8 +606,9 @@
           }
         }
 
-        if (!importRunning) {
-          importBtn.textContent = 'Import 2026 history ↓';
+        stopImportBtn.disabled = true;
+        importBtn.textContent = 'Importar historial 2026';
+        if (importCompletedNaturally) {
           setStatus('Enriqueciendo datos adicionales…');
           await enrichExtra();
           setStatus('Historia importada hasta 01/01/2026.', 'ok');

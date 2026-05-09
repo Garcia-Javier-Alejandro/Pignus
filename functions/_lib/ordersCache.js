@@ -53,6 +53,8 @@ function slimOrder(order) {
 }
 
 // isOlderFetch=false on "fetch latest" — preserves existing next_older_offset after first load.
+// next_older_offset only goes negative via an explicit import (isOlderFetch=true) so a cron
+// fetch on a fresh cache can never accidentally set the "done" signal.
 export function mergeIntoCache(cache, { newOrders, total, fetchedOffset, isOlderFetch }) {
   const seenSet = new Set(cache.seen_ids || []);
 
@@ -72,7 +74,7 @@ export function mergeIntoCache(cache, { newOrders, total, fetchedOffset, isOlder
 
   const nextOlderOffset = isOlderFetch
     ? fetchedOffset - 20
-    : (cache.next_older_offset !== null ? cache.next_older_offset : fetchedOffset - 20);
+    : (cache.next_older_offset !== null ? cache.next_older_offset : Math.max(0, fetchedOffset - 20));
 
   return {
     orders: allOrders,

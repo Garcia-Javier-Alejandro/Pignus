@@ -22,8 +22,8 @@
       <div class="toolbar">
         <div class="toolbar-left">
           <button id="add-row-btn" type="button" class="btn btn--primary">+ Agregar fila</button>
-          <button id="edit-btn" type="button" class="btn btn--ghost" disabled>✏ Editar</button>
-          <button id="delete-btn" type="button" class="btn btn--ghost btn--danger" disabled>🗑 Eliminar</button>
+          <button id="edit-btn" type="button" class="btn btn--ghost" disabled>✎ Editar</button>
+          <button id="delete-btn" type="button" class="btn btn--ghost btn--danger" disabled>✕ Eliminar</button>
         </div>
         <p id="status" class="status" aria-live="polite"></p>
         <div class="toolbar-right">
@@ -145,8 +145,8 @@
         const count = checkedIds.size;
         deleteBtn.disabled = count === 0;
         editBtn.disabled = count !== 1;
-        editBtn.textContent = count > 1 ? '✏ No se puede editar múltiples filas' : '✏ Editar';
-        deleteBtn.textContent = '🗑 Eliminar';
+        editBtn.textContent = count > 1 ? '✎ No se puede editar múltiples filas' : '✎ Editar';
+        deleteBtn.textContent = '✕ Eliminar';
       };
 
       const updateMeta = (meta) => {

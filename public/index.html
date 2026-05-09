@@ -55,6 +55,14 @@
         </div>
       </section>
 
+      <details class="debug-section">
+        <summary>Aux Debug Tools</summary>
+        <div class="debug-body">
+          <button id="clear-cache-btn" type="button" class="btn btn--danger">✕ Limpiar caché</button>
+          <span id="clear-cache-status" class="debug-status"></span>
+        </div>
+      </details>
+
       <div hidden id="auth-section" style="margin-top:1rem">
         <button id="auth-btn" type="button" class="btn btn--ghost">Re-authorize ML ↗</button>
       </div>
@@ -108,9 +116,11 @@
       const fetchLbl      = $('fetch-label');
       const importBtn     = $('import-btn');
       const addRowBtn     = $('add-row-btn');
-      const editBtn   = $('edit-btn');
-      const deleteBtn = $('delete-btn');
-      const expandBtn = $('expand-btn');
+      const editBtn       = $('edit-btn');
+      const deleteBtn     = $('delete-btn');
+      const expandBtn     = $('expand-btn');
+      const clearCacheBtn = $('clear-cache-btn');
+      const clearCacheSt  = $('clear-cache-status');
       const table     = $('orders-table');
       const exportBtn     = $('export-btn');
       const openBtn       = $('open-btn');
@@ -359,6 +369,36 @@
 
         return { tr, inputs };
       };
+
+      // ── Clear cache ───────────────────────────────────────────────────────
+      clearCacheBtn.addEventListener('click', async () => {
+        clearCacheSt.textContent = '';
+        clearCacheBtn.disabled = true;
+        try {
+          const [cacheRes, editsRes] = await Promise.all([
+            fetch('/api/orders/cache', { method: 'DELETE', headers: authHeader() }),
+            fetch('/api/edits', {
+              method: 'POST',
+              headers: { ...authHeader(), 'content-type': 'application/json' },
+              body: JSON.stringify({ manualRows: [], hiddenIds: [], mlOverrides: {} }),
+            }),
+          ]);
+          if (!cacheRes.ok || !editsRes.ok) throw new Error('Error al limpiar');
+          editsState = { manualRows: [], hiddenIds: [], mlOverrides: {} };
+          lastFetchedRows = [];
+          lastHeaders = [];
+          checkedIds.clear();
+          table.innerHTML = '';
+          importBtn.textContent = 'Importar historial 2026';
+          importBtn.disabled = false;
+          updateMeta({ loaded: 0, oldest_date: null, probe_total: 0, next_older_offset: null });
+          clearCacheSt.textContent = '✓ Caché limpiada';
+        } catch (e) {
+          clearCacheSt.textContent = `Error: ${e.message}`;
+        } finally {
+          clearCacheBtn.disabled = false;
+        }
+      });
 
       // ── Expand / collapse columns ─────────────────────────────────────────
       expandBtn.addEventListener('click', () => {

@@ -162,6 +162,13 @@ input[type="password"]:focus { border-color: var(--border-mid); }
 
 .meta-sep { color: var(--border-mid); }
 
+.btn--expand {
+  margin-left: auto;
+  font-size: 0.7rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 99px;
+}
+
 .progress-wrap {
   display: flex;
   align-items: center;

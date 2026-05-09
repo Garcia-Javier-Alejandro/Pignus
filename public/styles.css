@@ -115,11 +115,6 @@ input[type="password"]:focus { border-color: var(--border-mid); }
 }
 .btn--danger:hover:not(:disabled) { background: rgba(194, 59, 34, 0.06); }
 
-/* ── Toolbar separator ── */
-
-.toolbar-sep {
-  flex: 1;
-}
 
 /* ── Layout ── */
 
@@ -138,9 +133,9 @@ input[type="password"]:focus { border-color: var(--border-mid); }
 /* ── Status ── */
 
 .status {
+  flex: 1;
   font-size: 0.75rem;
   color: var(--ink-3);
-  margin-left: 0.25rem;
 }
 .status--ok  { color: var(--ok); }
 .status--err { color: var(--err); }

@@ -20,6 +20,7 @@
 
     <main class="main">
       <div class="toolbar">
+        <p id="status" class="status" aria-live="polite"></p>
         <button id="fetch-btn" type="button" class="btn btn--primary">
           <span id="fetch-label">Fetch last 20 orders</span>
         </button>
@@ -27,11 +28,8 @@
         <button id="export-btn" type="button" class="btn btn--secondary" disabled>Append new entries to Google Sheet</button>
         <button id="open-btn" type="button" class="btn btn--secondary" disabled>Open Sheet ↗</button>
         <button id="add-row-btn" type="button" class="btn btn--primary">+ Agregar fila</button>
-        <span class="toolbar-sep"></span>
-        <button id="edit-btn" type="button" class="btn btn--ghost" hidden>Editar fila</button>
-        <button id="delete-btn" type="button" class="btn btn--ghost btn--danger" hidden>Eliminar</button>
-        <button id="clear-cache-btn" type="button" class="btn btn--ghost btn--danger">Limpiar caché</button>
-        <p id="status" class="status" aria-live="polite"></p>
+        <button id="edit-btn" type="button" class="btn btn--ghost" disabled>Editar fila</button>
+        <button id="delete-btn" type="button" class="btn btn--ghost btn--danger" disabled>Eliminar fila</button>
       </div>
 
       <div class="meta-bar" id="meta-bar">
@@ -97,10 +95,9 @@
       const fetchLbl      = $('fetch-label');
       const importBtn     = $('import-btn');
       const addRowBtn     = $('add-row-btn');
-      const editBtn       = $('edit-btn');
-      const deleteBtn     = $('delete-btn');
-      const clearCacheBtn = $('clear-cache-btn');
-      const table         = $('orders-table');
+      const editBtn   = $('edit-btn');
+      const deleteBtn = $('delete-btn');
+      const table     = $('orders-table');
       const exportBtn     = $('export-btn');
       const openBtn       = $('open-btn');
       const statusEl      = $('status');
@@ -132,16 +129,15 @@
       // ── Toolbar selection buttons ─────────────────────────────────────────
       const updateToolbar = () => {
         const count = checkedIds.size;
-        editBtn.hidden = count === 0;
-        deleteBtn.hidden = count === 0;
+        deleteBtn.disabled = count === 0;
         if (count > 1) {
           editBtn.textContent = 'No se puede editar múltiples filas';
           editBtn.disabled = true;
         } else {
           editBtn.textContent = 'Editar fila';
-          editBtn.disabled = false;
+          editBtn.disabled = count === 0;
         }
-        deleteBtn.textContent = count === 1 ? 'Eliminar fila' : `Eliminar ${count} filas`;
+        deleteBtn.textContent = count <= 1 ? 'Eliminar fila' : `Eliminar ${count} filas`;
       };
 
       const updateMeta = (meta) => {
@@ -438,29 +434,6 @@
         checkedIds.clear();
         updateToolbar();
         renderTable({ headers: lastHeaders, rows: lastFetchedRows });
-      });
-
-      // ── Clear server cache ────────────────────────────────────────────────
-      clearCacheBtn.addEventListener('click', async () => {
-        if (!confirm('¿Limpiar toda la caché de órdenes? Deberás reimportar el historial completo desde 01/01/2026.')) return;
-        try {
-          const res = await fetch('/api/orders/cache', { method: 'DELETE', headers: authHeader() });
-          if (!res.ok) throw new Error('Error al limpiar caché');
-          localStorage.removeItem(HIDDEN_KEY);
-          localStorage.removeItem(OVERRIDES_KEY);
-          lastFetchedRows = [];
-          lastHeaders = [];
-          checkedIds.clear();
-          updateToolbar();
-          table.innerHTML = '';
-          importBtn.textContent = 'Import 2026 history ↓';
-          importBtn.disabled = false;
-          exportBtn.disabled = true;
-          openBtn.disabled = true;
-          setStatus('Caché limpiada. Reimportá el historial.', 'ok');
-        } catch (err) {
-          setStatus(err.message, 'err');
-        }
       });
 
       let lastFetchedRows = [];

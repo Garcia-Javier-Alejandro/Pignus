@@ -132,9 +132,16 @@ export async function enrichOrders(orders, env) {
       });
       if (shipRes.ok) {
         const shipData = await shipRes.json();
+        const city = shipData.receiver_address?.city
+          ?? shipData.destination?.receiver_address?.city
+          ?? shipData.destination?.shipping_address?.city
+          ?? null;
         fullOrder.shipping = {
           ...fullOrder.shipping,
-          receiver_address: shipData.receiver_address,
+          receiver_address: {
+            ...(shipData.receiver_address || {}),
+            city,
+          },
           _state: shipData.destination?.shipping_address?.state
                ?? shipData.destination?.receiver_address?.state
                ?? null,

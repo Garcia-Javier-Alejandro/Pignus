@@ -3,7 +3,7 @@ export async function onRequestGet({ env }) {
     response_type: 'code',
     client_id: env.MELI_APP_ID,
     redirect_uri: env.MELI_REDIRECT_URI,
-    scope: 'offline_access read write',
+    scope: 'offline_access read write billing',
   });
 
   return Response.redirect(`https://auth.mercadolibre.com.ar/authorization?${params.toString()}`, 302);

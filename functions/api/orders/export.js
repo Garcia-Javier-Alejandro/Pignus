@@ -1,15 +1,9 @@
-import { errorResponse, json, requireAdmin } from '../../_lib/http.js';
+import { errorResponse, json } from '../../_lib/http.js';
 import { fetchAllPaidOrders } from '../../_lib/meliOrders.js';
 import { appendRows, getExistingOrderIds } from '../../_lib/sheets.js';
 import { OUTPUT_HEADERS, transformOrdersToRows } from '../../_lib/transform.js';
 
-export async function onRequestPost({ request, env }) {
-  const authError = await requireAdmin(request, env);
-
-  if (authError) {
-    return authError;
-  }
-
+export async function onRequestPost({ env }) {
   try {
     const existingOrderIds = await getExistingOrderIds(env);
     const orders = await fetchAllPaidOrders(env);

@@ -1,13 +1,10 @@
-import { errorResponse, json, requireAdmin } from '../../_lib/http.js';
+import { errorResponse, json } from '../../_lib/http.js';
 import { fetchOrdersAtOffset } from '../../_lib/meliOrders.js';
 import { fetchEnrichAndStore } from '../../_lib/fetchAndStore.js';
 import { getOrdersCache, isCacheDone } from '../../_lib/ordersCache.js';
 import { OUTPUT_HEADERS, transformOrdersToRows } from '../../_lib/transform.js';
 
-export async function onRequestGet({ request, env }) {
-  const authError = await requireAdmin(request, env);
-  if (authError) return authError;
-
+export async function onRequestGet({ env }) {
   try {
     const cache = await getOrdersCache(env);
 

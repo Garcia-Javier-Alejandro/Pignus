@@ -1,4 +1,4 @@
-import { requireAdmin, json } from '../../_lib/http.js';
+import { json } from '../../_lib/http.js';
 import { getOrdersCache, saveOrdersCache, isCacheDone } from '../../_lib/ordersCache.js';
 import { getValidAccessToken } from '../../_lib/meliAuth.js';
 import { fetchFiscalDate, fetchCouponAmount } from '../../_lib/meliOrders.js';
@@ -7,9 +7,6 @@ import { OUTPUT_HEADERS, transformOrdersToRows } from '../../_lib/transform.js';
 const BATCH = 20;
 
 export async function onRequestGet({ env, request }) {
-  const err = await requireAdmin(request, env);
-  if (err) return err;
-
   // Debug: ?probe_fiscal=ORDER_ID returns raw fiscal_documents API responses for that order
   const probeId = new URL(request.url).searchParams.get('probe_fiscal');
   if (probeId) {

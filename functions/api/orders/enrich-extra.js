@@ -43,27 +43,32 @@ export async function onRequestGet({ env, request }) {
     const seenPacks = new Set();
 
     for (const order of toEnrich) {
-      if (order._fecha_factura === undefined) {
-        const packId = order.pack_id ? String(order.pack_id) : null;
-        if (packId && seenPacks.has(packId)) {
-          const sibling = cache.orders.find(
-            (o) => String(o.pack_id) === packId && o._fecha_factura !== undefined,
-          );
-          order._fecha_factura = sibling?._fecha_factura ?? null;
-        } else {
-          if (packId) seenPacks.add(packId);
-          order._fecha_factura = await fetchFiscalDate(order.pack_id, order.id, access_token) ?? null;
-          if (packId) {
-            for (const o of cache.orders) {
-              if (String(o.pack_id) === packId && o._fecha_factura === undefined) {
-                o._fecha_factura = order._fecha_factura;
+      try {
+        if (order._fecha_factura === undefined) {
+          const packId = order.pack_id ? String(order.pack_id) : null;
+          if (packId && seenPacks.has(packId)) {
+            const sibling = cache.orders.find(
+              (o) => String(o.pack_id) === packId && o._fecha_factura !== undefined,
+            );
+            order._fecha_factura = sibling?._fecha_factura ?? null;
+          } else {
+            if (packId) seenPacks.add(packId);
+            order._fecha_factura = await fetchFiscalDate(order.pack_id, order.id, access_token) ?? null;
+            if (packId) {
+              for (const o of cache.orders) {
+                if (String(o.pack_id) === packId && o._fecha_factura === undefined) {
+                  o._fecha_factura = order._fecha_factura;
+                }
               }
             }
           }
         }
-      }
-      if (order._cupon === undefined) {
-        order._cupon = await fetchCouponAmount(order.id, access_token);
+        if (order._cupon === undefined) {
+          order._cupon = await fetchCouponAmount(order.id, access_token);
+        }
+      } catch {
+        if (order._fecha_factura === undefined) order._fecha_factura = null;
+        if (order._cupon === undefined) order._cupon = 0;
       }
     }
 

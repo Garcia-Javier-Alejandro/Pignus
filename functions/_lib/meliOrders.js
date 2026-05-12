@@ -160,9 +160,12 @@ export async function fetchFiscalDate(packId, orderId, accessToken) {
     const res = await fetch(`https://api.mercadolibre.com/${path}`, {
       headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) continue;
-    const data = await res.json();
+    if (!res.ok || res.status === 204) continue;
+    let data;
+    try { data = await res.json(); } catch { continue; }
+    if (!data || typeof data !== 'object') continue;
     const items = Array.isArray(data) ? data : (data.fiscal_documents ?? data.results ?? [data]);
+    if (!Array.isArray(items)) continue;
     for (const doc of items) {
       if (!doc || typeof doc !== 'object') continue;
       const date = doc.date ?? doc.fiscal_date ?? doc.date_created ?? doc.issue_date ?? null;

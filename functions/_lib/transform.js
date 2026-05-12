@@ -6,6 +6,7 @@ export const OUTPUT_HEADERS = [
   'Fecha Compra',
   'Nombre',
   'Pago',
+  'Cupón',
   'Recargo MP',
   'Retencion IIBB',
   'Imp SIRTAC',
@@ -16,7 +17,6 @@ export const OUTPUT_HEADERS = [
   'Provincia',
   'Orígen',
   'Fecha Factura',
-  'Cupón',
 ];
 
 const sumPaymentsField = (payments, field) => (
@@ -51,6 +51,7 @@ export function transformOrderToRow(order) {
     order.date_created || '',
     `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || order.buyer?.nickname || '',
     pago,
+    toNumber(order._cupon),
     recargoMp,
     retencionIibb,
     impSirtac,
@@ -61,7 +62,6 @@ export function transformOrderToRow(order) {
     nameOf(order.shipping?._state),
     'ML',
     order._fecha_factura || '',
-    toNumber(order._cupon),
   ];
 }
 

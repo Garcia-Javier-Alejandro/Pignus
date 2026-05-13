@@ -173,6 +173,7 @@
         <summary>Aux Debug Tools</summary>
         <div class="debug-body">
           <button id="clear-cache-btn" type="button" class="btn btn--danger">✕ Limpiar caché</button>
+          <button id="clear-dates-btn" type="button" class="btn btn--danger">✕ Limpiar Fecha Factura</button>
           <span id="clear-cache-status" class="debug-status"></span>
         </div>
       </details>
@@ -691,6 +692,24 @@
           clearCacheSt.textContent = `Error: ${e.message}`;
         } finally {
           clearCacheBtn.disabled = false;
+        }
+      });
+
+      $('clear-dates-btn').addEventListener('click', async () => {
+        clearCacheSt.textContent = '';
+        if (!confirm('¿Limpiar todas las Fechas Factura del caché? Los estados volverán a Pendiente hasta reimportar Contabilium.')) return;
+        $('clear-dates-btn').disabled = true;
+        try {
+          const res = await fetch('/api/orders/clear-invoice-dates', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error');
+          clearCacheSt.textContent = `✓ ${data.cleared} fechas eliminadas`;
+          const cacheData = await fetch('/api/orders/cache').then((r) => r.json());
+          if (cacheData.rows?.length) applyData(cacheData);
+        } catch (e) {
+          clearCacheSt.textContent = `Error: ${e.message}`;
+        } finally {
+          $('clear-dates-btn').disabled = false;
         }
       });
 

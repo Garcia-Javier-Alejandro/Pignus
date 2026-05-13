@@ -883,24 +883,26 @@
 
         const parseXml = (text) => new DOMParser().parseFromString(text, 'application/xml');
 
+        const byNS = (el, tag) => [...el.getElementsByTagNameNS('*', tag)];
+
         const ssText = await zip.file('xl/sharedStrings.xml')?.async('text') ?? '<sst/>';
         const ssDoc  = parseXml(ssText);
-        const sharedStrings = [...ssDoc.getElementsByTagName('si')].map((si) => {
-          const tNodes = si.getElementsByTagName('t');
-          return [...tNodes].map((t) => t.textContent).join('');
-        });
+        const sharedStrings = byNS(ssDoc, 'si').map((si) =>
+          byNS(si, 't').map((t) => t.textContent).join(''),
+        );
 
         const wsText = await zip.file('xl/worksheets/sheet1.xml')?.async('text');
         if (!wsText) throw new Error('No se encontró la hoja de datos en el archivo.');
         const wsDoc  = parseXml(wsText);
-        const rowEls = [...wsDoc.getElementsByTagName('row')];
+        const rowEls = byNS(wsDoc, 'row');
         if (rowEls.length < 2) throw new Error('El archivo no contiene filas de datos.');
 
         const getCellVal = (cellEl) => {
           const t = cellEl.getAttribute('t');
-          const vEl = cellEl.getElementsByTagName('v')[0];
+          const vEl = byNS(cellEl, 'v')[0];
           if (!vEl) return '';
           if (t === 's') return sharedStrings[+vEl.textContent] ?? '';
+          if (t === 'inlineStr') return byNS(cellEl, 't').map((n) => n.textContent).join('');
           return vEl.textContent;
         };
 
@@ -908,7 +910,7 @@
 
         // Header row → column-letter-to-name map
         const colByName = {};
-        for (const cell of rowEls[0].getElementsByTagName('c')) {
+        for (const cell of byNS(rowEls[0], 'c')) {
           const name = getCellVal(cell);
           if (name) colByName[name] = colLetter(cell.getAttribute('r'));
         }
@@ -920,7 +922,7 @@
 
         for (const rowEl of rowEls.slice(1)) {
           const cellMap = {};
-          for (const cell of rowEl.getElementsByTagName('c')) {
+          for (const cell of byNS(rowEl, 'c')) {
             cellMap[colLetter(cell.getAttribute('r'))] = getCellVal(cell);
           }
           const tipo = getCell(cellMap, 'Tipo');

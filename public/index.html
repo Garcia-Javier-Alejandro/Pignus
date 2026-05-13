@@ -241,6 +241,14 @@
 
       const ars = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
 
+      // Date-only strings (YYYY-MM-DD) are parsed as UTC midnight by JS, which shifts
+      // them to the previous day in negative-offset timezones. Force local midnight instead.
+      const parseDate = (val) => {
+        if (!val) return new Date(NaN);
+        const s = String(val);
+        return new Date(s.length === 10 ? s + 'T00:00:00' : s);
+      };
+
       const formatDate = (val) => {
         if (!val) return '';
         const d = new Date(val);
@@ -358,7 +366,7 @@
         const TODAY_DAY     = NOW.getDate(); // cap prev-month window to same day of month
 
         for (const row of allRows) {
-          const compraDate = new Date(row[fechaIdx]);
+          const compraDate = parseDate(row[fechaIdx]);
           if (isNaN(compraDate)) continue;
           const pago   = Number(row[pagoIdx]  || 0);
           const neto   = netoIdx  !== -1 ? Number(row[netoIdx]  || 0) : 0;
@@ -382,7 +390,7 @@
           // Card 2 & 3: invoiced rows, dated by Fecha Factura
           if (numFact) {
             const factDateStr = fechaFactIdx !== -1 ? row[fechaFactIdx] : '';
-            const factDate = factDateStr ? new Date(factDateStr) : compraDate;
+            const factDate = factDateStr ? parseDate(factDateStr) : compraDate;
             const fd = isNaN(factDate) ? compraDate : factDate;
             if (fd.getFullYear() === CURRENT_YEAR) {
               factYear += neto + costo;
@@ -456,7 +464,7 @@
         const fromEl = $('period-from');
         const toEl   = $('period-to');
         if (fromEl.value && toEl.value) {
-          const from = new Date(fromEl.value);
+          const from = parseDate(fromEl.value);
           const to   = new Date(toEl.value + 'T23:59:59');
           let sp = 0, bp = 0;
           for (const row of allRows) {

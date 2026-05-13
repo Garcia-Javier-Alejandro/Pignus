@@ -25,6 +25,7 @@ export async function onRequestGet({ env }) {
       oldest_date: cache.oldest_date,
       next_older_offset: cache.next_older_offset,
       done: isCacheDone(cache),
+      updated_at: cache.updated_at,
     },
   });
 }

@@ -12,6 +12,29 @@ Pignus is a Cloudflare Pages app that fetches paid Mercado Libre Argentina order
 
 All API calls run inside Cloudflare Pages Functions so OAuth tokens and service account credentials stay server-side.
 
+## UI / Dashboard
+
+The frontend (`public/index.html`) is a single vanilla JS page with no framework. Styles come entirely from the shared PignusUI package (`https://ui.pignuslabs.com.ar/pignus.css`). App-specific overrides live in a thin local `app.css` if needed.
+
+**Header:** PignusLabs logo (links to Portal) + pill tab nav (Portal / Facturación / Inversiones) + Welcome [user] resolved from Cloudflare Access identity.
+
+**KPI strip (3 cards above the table):**
+- **Ventas** — order count this month, % change vs previous month, 30-day rolling sparkline.
+- **Facturado** — gross Pago this month, % change vs previous month, gold pill showing pending order count and amount, 30-day rolling sparkline.
+- **Restante en categoría** — remaining annual billing headroom under the selected Monotributo category (A–K), with two stacked progress bars: este año (vs annual limit) and este mes (vs annual limit ÷ 12).
+
+**Period row:** custom date range selector showing Ventas and Facturado for any chosen period.
+
+**Table:** order data with a computed **Estado** column — `Pendiente` (amber) if `Fecha Factura` is empty, `Facturado` (green) otherwise. Collapsed and expanded column sets both include Estado.
+
+**History import bar (below table):** incremental import button, order count, oldest date, progress bar toward full 2026 history.
+
+## TODO
+
+- **Integrate factura data (non-ML source):** Orders invoiced outside Mercado Libre (direct sales, other channels) are not currently captured. The table and KPI calculations should support rows sourced from actual invoice records — not just ML orders. This requires a new data ingestion path (manual upload, AFIP integration, or similar) and a way to distinguish invoice-sourced rows from ML-sourced rows in the cache.
+- **Wire pending orders properly:** The `Estado` column currently derives status from whether `Fecha Factura` is filled. A proper implementation would track billing status independently so an order can be marked Facturado even if the invoice date comes from a non-ML source.
+- **Métricas del negocio section:** Ticket promedio, clientes únicos, recurrencia, impuestos acumulados, cupones, días facturando — designed but not yet implemented.
+
 ## Output Table
 
 | Column | Source |
@@ -38,7 +61,7 @@ Orders sharing a `pack_id` are merged into a single row.
 public/
   index.html        Frontend — vanilla JS, no framework
   styles.css
-  Logo_Pignus_Facturacion.png
+  PignusLabs_Logo.png
 
 functions/
   _lib/

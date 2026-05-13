@@ -12,21 +12,25 @@
   </head>
   <body>
     <header class="header">
-      <a href="https://pignuslabs.com.ar/" style="display:flex;align-items:center;text-decoration:none">
-        <img src="/PignusLabs_Logo.png" alt="Pignus Labs" class="header__logo">
-      </a>
-      <div class="header__rule"></div>
-      <span class="header__wordmark">Facturación</span>
-      <nav class="mod-nav" style="margin-left:auto">
+      <div class="header__brand">
+        <a href="https://pignuslabs.com.ar/" style="display:flex;align-items:center;text-decoration:none">
+          <img src="/PignusLabs_Logo.png" alt="Pignus Labs" class="header__logo">
+        </a>
+        <div class="header__rule"></div>
+        <span class="header__wordmark">Facturación</span>
+      </div>
+      <nav class="mod-nav">
         <a href="https://pignuslabs.com.ar/" class="mod-nav__item">Portal</a>
         <a href="#" class="mod-nav__item mod-nav__item--active">Facturación</a>
         <a href="https://inversiones.pignuslabs.com.ar/" class="mod-nav__item">Inversiones</a>
       </nav>
-      <div class="header__pulse" id="header-pulse" style="display:none">
-        <span class="header__pulse-dot"></span>
-        <span id="header-pulse-text"></span>
+      <div class="header__end">
+        <div class="header__pulse" id="header-pulse" style="display:none">
+          <span class="header__pulse-dot"></span>
+          <span id="header-pulse-text"></span>
+        </div>
+        <button class="header__avatar" id="header-avatar" title="" style="display:none"></button>
       </div>
-      <button class="header__avatar" id="header-avatar" title="" style="display:none"></button>
     </header>
 
     <main class="main">
@@ -1190,7 +1194,8 @@
           if (res.ok) {
             const { email } = await res.json();
             const avatar = $('header-avatar');
-            avatar.textContent = email[0].toUpperCase();
+            const parts = email.split('@')[0].split('.');
+            avatar.textContent = (parts[0][0] + (parts[1]?.[0] ?? '')).toUpperCase();
             avatar.title = email;
             avatar.style.display = '';
           }

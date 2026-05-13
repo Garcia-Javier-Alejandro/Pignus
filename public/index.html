@@ -63,13 +63,13 @@
         <div class="kpi-card">
           <div class="kpi-card__eyebrow">Facturado este mes</div>
           <div class="kpi-card__value kpi-card__value--lg" id="kpi-billed-month">—</div>
-          <div id="kpi-pending-block" style="display:none;margin-top:auto">
-            <span class="pill pill--pending" style="font-size:12px;padding:.25rem .65rem;gap:.4rem">
+          <div id="kpi-pending-block" style="display:none;margin-top:auto;background:var(--pending-bg);border:1px solid var(--pending-bdr);border-radius:.75rem;padding:.75rem 1rem">
+            <div class="kpi-card__eyebrow" style="color:var(--pending-fg);margin-bottom:.35rem">Pendiente de facturar</div>
+            <div id="kpi-pending-amount" style="font-family:var(--font-serif);font-size:1.5rem;font-weight:500;letter-spacing:-0.01em;color:var(--pending-fg);line-height:1;margin-bottom:.4rem">—</div>
+            <div style="display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:var(--pending-fg);opacity:.75">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
               <span id="kpi-pending-count"></span>
-              <span style="color:var(--ink-3)">·</span>
-              <span id="kpi-pending-amount" style="color:var(--ink-3)"></span>
-            </span>
+            </div>
           </div>
         </div>
 
@@ -419,8 +419,8 @@
         $('kpi-billed-month').textContent = ars.format(factMonth);
         const pendingBlock = $('kpi-pending-block');
         if (pendingCount > 0) {
-          $('kpi-pending-count').textContent  = `${pendingCount} sin facturar (${pendingMonthCount} este mes)`;
           $('kpi-pending-amount').textContent = ars.format(pendingAmount);
+          $('kpi-pending-count').textContent  = `${pendingCount} orden${pendingCount !== 1 ? 'es' : ''} sin facturar (${pendingMonthCount} del mes actual)`;
           pendingBlock.style.display = '';
         } else {
           pendingBlock.style.display = 'none';

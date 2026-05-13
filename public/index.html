@@ -26,7 +26,7 @@
         <span class="header__pulse-dot"></span>
         <span id="header-pulse-text"></span>
       </div>
-      <span class="header__user" id="header-user"></span>
+      <button class="header__avatar" id="header-avatar" title="" style="display:none"></button>
     </header>
 
     <main class="main">
@@ -63,7 +63,7 @@
         <div class="kpi-card">
           <div class="kpi-card__eyebrow">Facturado este mes</div>
           <div class="kpi-card__value kpi-card__value--lg" id="kpi-billed-month">—</div>
-          <div id="kpi-pending-block" style="display:none;margin-top:auto;background:var(--pending-bg);border:1px solid var(--pending-bdr);border-radius:.75rem;padding:.75rem 1rem">
+          <div id="kpi-pending-block" style="display:none;margin-top:auto;background:var(--pending-bg);border:1px solid var(--pending-bdr);border-radius:99px;padding:.85rem 1.25rem">
             <div class="kpi-card__eyebrow" style="color:var(--pending-fg);margin-bottom:.35rem">Pendiente de facturar</div>
             <div id="kpi-pending-amount" style="font-family:var(--font-serif);font-size:1.5rem;font-weight:500;letter-spacing:-0.01em;color:var(--pending-fg);line-height:1;margin-bottom:.4rem">—</div>
             <div style="display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:var(--pending-fg);opacity:.75">
@@ -214,8 +214,8 @@
       const READONLY_COLS = new Set(['Suma Impuestos', 'Neto']);
       const DATE_COLS    = new Set(['Fecha Compra', 'Fecha Factura']);
 
-      const COLLAPSED_COLS = ['Nombre', 'Fecha Factura', 'Nº Factura', 'Pago', 'Cupón', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Estado'];
-      const EXPANDED_COLS  = ['Orden ID', 'Nombre', 'Fecha Compra', 'Fecha Factura', 'Nº Factura', 'Pago', 'Cupón', 'Retencion IIBB', 'Imp SIRTAC', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Localidad', 'Orígen', 'Estado'];
+      const COLLAPSED_COLS = ['Orden ID', 'Fecha Compra', 'Nombre', 'Pago', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Orígen', 'Estado', 'Fecha Factura', 'Nº Factura'];
+      const EXPANDED_COLS  = ['Orden ID', 'Fecha Compra', 'Nombre', 'Pago', 'Cupón', 'Retencion IIBB', 'Imp SIRTAC', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Localidad', 'Orígen', 'Estado', 'Fecha Factura', 'Nº Factura'];
 
       const TAX_CATEGORIES = {
         A: 6_800_000,  B: 10_200_000, C: 14_400_000, D: 20_200_000,
@@ -228,6 +228,8 @@
       const CURRENT_YEAR  = NOW.getFullYear();
 
       let isExpanded = false;
+      let sortCol    = null;
+      let sortDir    = 'asc';
       const getVisibleCols = (headers) => (isExpanded ? EXPANDED_COLS : COLLAPSED_COLS)
         .map((name) => ({ name, idx: name === 'Estado' ? -2 : headers.indexOf(name) }))
         .filter(({ name, idx }) => name === 'Estado' || idx !== -1);
@@ -522,7 +524,14 @@
         for (const { name: h } of visibleCols) {
           const th = document.createElement('th');
           th.textContent = h;
+          th.classList.add('th--sortable');
           if (MONEY_COLS.has(h)) th.classList.add('num');
+          if (sortCol === h) th.classList.add(sortDir === 'asc' ? 'th--sort-asc' : 'th--sort-desc');
+          th.addEventListener('click', () => {
+            if (sortCol === h) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+            else               { sortCol = h; sortDir = 'asc'; }
+            renderTable({ headers: lastHeaders, rows: lastFetchedRows });
+          });
           headRow.append(th);
         }
         headRow.append(document.createElement('th'));
@@ -558,6 +567,11 @@
               } else if (MONEY_COLS.has(h)) {
                 td.textContent = ars.format(Number(val || 0));
                 td.classList.add('num');
+              } else if (h === 'Nombre') {
+                const span = document.createElement('span');
+                span.className = 'cell-truncate';
+                span.textContent = val ?? '';
+                td.append(span);
               } else {
                 td.textContent = val ?? '';
               }
@@ -609,6 +623,26 @@
           ];
 
           allDisplayRows.sort((a, b) => {
+            if (sortCol) {
+              const colIdx = sortCol === 'Estado' ? -2 : headers.indexOf(sortCol);
+              let va, vb;
+              if (sortCol === 'Estado') {
+                va = getEstado(a.row) || '';
+                vb = getEstado(b.row) || '';
+              } else if (DATE_COLS.has(sortCol)) {
+                va = new Date(a.row[colIdx] || 0).getTime();
+                vb = new Date(b.row[colIdx] || 0).getTime();
+              } else if (MONEY_COLS.has(sortCol)) {
+                va = Number(a.row[colIdx] || 0);
+                vb = Number(b.row[colIdx] || 0);
+              } else {
+                va = (a.row[colIdx] ?? '').toString().toLowerCase();
+                vb = (b.row[colIdx] ?? '').toString().toLowerCase();
+              }
+              const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb, 'es', { numeric: true });
+              return sortDir === 'asc' ? cmp : -cmp;
+            }
+            // default: Fecha Compra desc, then Nombre asc
             const fa = a.row[fechaColIdx] || '';
             const fb = b.row[fechaColIdx] || '';
             if (fb > fa) return 1;
@@ -1155,7 +1189,10 @@
           const res = await fetch('/cdn-cgi/access/get-identity', { credentials: 'include' });
           if (res.ok) {
             const { email } = await res.json();
-            $('header-user').textContent = `Hola, ${email.split('@')[0]}`;
+            const avatar = $('header-avatar');
+            avatar.textContent = email[0].toUpperCase();
+            avatar.title = email;
+            avatar.style.display = '';
           }
         } catch {}
       })();

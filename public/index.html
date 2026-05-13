@@ -30,9 +30,9 @@
 
         <!-- Card 1: Ventas -->
         <div class="kpi-card">
-          <div class="kpi-card__eyebrow">Ventas este mes</div>
-          <div style="display:flex;gap:1.25rem;flex:1;min-height:0">
+          <div style="display:flex;flex:1;min-height:0">
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+              <div class="kpi-card__eyebrow">Ventas este mes</div>
               <div class="kpi-card__value" id="kpi-sales-month">—</div>
               <div class="kpi-card__meta" style="margin-top:0">
                 <span class="kpi-delta" id="kpi-sales-delta"></span>
@@ -40,9 +40,10 @@
               </div>
               <svg class="kpi-spark" id="spark-sales" viewBox="0 0 200 36" preserveAspectRatio="none" style="margin-top:auto"></svg>
             </div>
+            <div style="width:1px;background:var(--border);margin:0 1.25rem;align-self:stretch"></div>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
-              <div class="kpi-card__eyebrow" style="color:var(--ink-2)">Ingresos Netos</div>
-              <div class="kpi-card__value" id="kpi-neto-month" style="font-size:clamp(1rem,2vw,1.5rem)">—</div>
+              <div class="kpi-card__eyebrow">Ingresos Netos</div>
+              <div class="kpi-card__value" id="kpi-neto-month" style="font-size:clamp(.85rem,1.6vw,1.4rem)">—</div>
               <div class="kpi-card__meta" style="margin-top:0">
                 <span class="kpi-delta" id="kpi-neto-delta"></span>
                 <span id="kpi-neto-delta-label"></span>
@@ -606,16 +607,27 @@
           tr.append(td);
           tbody.append(tr);
         } else {
-          for (const row of manualRows) {
-            tbody.append(buildRow(row, `manual-${row[0]}-${row[1]}`, true));
-          }
-          for (const row of getInvoiceRows()) {
-            tbody.append(buildRow(row, `invoice-${row[0]}`, true));
-          }
-          for (const row of rows) {
-            const rowId = String(row[0]);
-            if (hiddenIds.has(rowId)) continue;
-            tbody.append(buildRow(row, rowId, false));
+          const fechaColIdx  = headers.indexOf('Fecha Compra');
+          const nombreColIdx = headers.indexOf('Nombre');
+
+          const allDisplayRows = [
+            ...manualRows.map((r) => ({ row: r, rowId: `manual-${r[0]}-${r[1]}`, isManual: true })),
+            ...getInvoiceRows().map((r) => ({ row: r, rowId: `invoice-${r[0]}`, isManual: true })),
+            ...rows.filter((r) => !hiddenIds.has(String(r[0]))).map((r) => ({ row: r, rowId: String(r[0]), isManual: false })),
+          ];
+
+          allDisplayRows.sort((a, b) => {
+            const fa = a.row[fechaColIdx] || '';
+            const fb = b.row[fechaColIdx] || '';
+            if (fb > fa) return 1;
+            if (fb < fa) return -1;
+            const na = (a.row[nombreColIdx] || '').toLowerCase();
+            const nb = (b.row[nombreColIdx] || '').toLowerCase();
+            return na < nb ? -1 : na > nb ? 1 : 0;
+          });
+
+          for (const { row, rowId, isManual } of allDisplayRows) {
+            tbody.append(buildRow(row, rowId, isManual));
           }
         }
 
@@ -1034,16 +1046,16 @@
         const numFactIdx = lastHeaders.indexOf('Nº Factura');
         const byOrdId    = new Map(lastFetchedRows.map((r) => [String(r[0]), r]));
 
-        const fresh = [], overwrites = [], unmatched = [];
+        const fresh = [], overwrites = [];
         for (const [idVenta, { numero }] of Object.entries(mlMatches)) {
           const existing = byOrdId.get(idVenta);
-          if (!existing) { unmatched.push(idVenta); continue; }
+          if (!existing) { fresh.push(idVenta); continue; } // pack_id mismatch — backend will match correctly
           const cur = numFactIdx !== -1 ? existing[numFactIdx] : '';
           if (cur && cur !== numero) overwrites.push({ ordId: idVenta, old: cur, new: numero });
           else fresh.push(idVenta);
         }
 
-        const mlTotal   = Object.keys(mlMatches).length;
+        const mlTotal    = Object.keys(mlMatches).length;
         const nonMlTotal = invoiceRows.length;
 
         let html = `<p style="font-size:.8rem;color:var(--ink-2);margin:0 0 1rem">
@@ -1051,9 +1063,8 @@
         </p><div style="display:flex;flex-direction:column;gap:.6rem">`;
 
         if (mlTotal > 0) {
-          html += `<div style="font-size:.8rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <span class="pill pill--ok">✓ ${fresh.length + overwrites.length} facturas ML</span>
-            ${unmatched.length ? `<span style="color:var(--ink-3)">(${unmatched.length} no están en el caché aún)</span>` : ''}
+          html += `<div style="font-size:.8rem">
+            <span class="pill pill--ok">✓ ${mlTotal} facturas ML vinculadas</span>
           </div>`;
         }
 

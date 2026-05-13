@@ -127,7 +127,7 @@ export async function appendRows(env, rows) {
   }
 
   const sheetName = env.SHEET_NAME || DEFAULT_SHEET_NAME;
-  const range = encodeURIComponent(`${sheetName}!A:J`);
+  const range = encodeURIComponent(`${sheetName}!A:Q`);
 
   return sheetsFetch(env, `/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: 'POST',

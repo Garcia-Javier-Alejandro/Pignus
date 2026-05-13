@@ -2,7 +2,7 @@ import { json } from '../_lib/http.js';
 
 const EDITS_KEY = 'edits';
 
-const empty = () => ({ manualRows: [], hiddenIds: [], mlOverrides: {} });
+const empty = () => ({ manualRows: [], hiddenIds: [], mlOverrides: {}, invoiceRows: [] });
 
 export async function onRequestGet({ env }) {
   return json(await env.PIGNUS_TOKENS.get(EDITS_KEY, 'json') || empty());
@@ -14,6 +14,7 @@ export async function onRequestPost({ request, env }) {
     manualRows:  body.manualRows  || [],
     hiddenIds:   body.hiddenIds   || [],
     mlOverrides: body.mlOverrides || {},
+    invoiceRows: body.invoiceRows || [],
   }));
   return json({ ok: true });
 }

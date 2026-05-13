@@ -48,6 +48,8 @@ function slimOrder(order) {
     _iibb: order._iibb,
     _sirtac: order._sirtac,
     _fecha_factura: order._fecha_factura,
+    _numero_factura: order._numero_factura ?? null,
+    _invoice_source: order._invoice_source ?? null,
     _cupon: order._cupon,
   };
 }

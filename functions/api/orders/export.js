@@ -5,12 +5,16 @@ import { OUTPUT_HEADERS, transformOrdersToRows } from '../../_lib/transform.js';
 
 export async function onRequestPost({ env }) {
   try {
-    const [existingOrderIds, cache] = await Promise.all([
+    const [existingOrderIds, cache, edits] = await Promise.all([
       getExistingOrderIds(env),
       getOrdersCache(env),
+      env.PIGNUS_TOKENS.get('edits', 'json').then((e) => e || { invoiceRows: [] }),
     ]);
 
-    const allRows = transformOrdersToRows(cache.orders || []);
+    const allRows = [
+      ...transformOrdersToRows(cache.orders || []),
+      ...(edits.invoiceRows || []),
+    ];
     allRows.sort((a, b) => (b[1] > a[1] ? 1 : -1));
 
     const newRows = allRows.filter((row) => !existingOrderIds.has(String(row[0])));

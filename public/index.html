@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital@0;1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://ui.pignuslabs.com.ar/pignus.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
   </head>
   <body>
     <header class="header">
@@ -120,9 +121,6 @@
         </div>
         <p id="status" class="status" aria-live="polite"></p>
         <div class="toolbar-right">
-          <button id="fetch-btn" type="button" class="btn btn--primary">
-            <span id="fetch-label">+ Cargar últimos pedidos</span>
-          </button>
           <button id="export-btn" type="button" class="btn btn--secondary" disabled>Añadir a Sheets</button>
           <button id="open-btn" type="button" class="btn btn--secondary" disabled>↗ Abrir Sheets</button>
         </div>
@@ -135,10 +133,17 @@
         </div>
       </section>
 
-      <!-- ── History import bar ───────────────────────────────────────────── -->
+      <!-- ── Import bar ────────────────────────────────────────────────────── -->
       <div class="meta-bar" id="meta-bar">
+        <button id="fetch-btn" type="button" class="btn btn--primary">
+          <span id="fetch-label">+ Cargar pedidos</span>
+        </button>
+        <span class="meta-sep">·</span>
         <button id="import-btn" type="button" class="btn btn--secondary">Importar historial 2026</button>
         <button id="stop-import-btn" type="button" class="btn btn--danger" disabled>⏹ Detener</button>
+        <span class="meta-sep">·</span>
+        <button id="contabilium-btn" type="button" class="btn btn--secondary">📄 Contabilium</button>
+        <input type="file" id="contabilium-file" accept=".xlsx" hidden>
         <span class="meta-sep">·</span>
         <span id="meta-count">—</span>
         <span class="meta-sep">·</span>
@@ -150,6 +155,18 @@
           <span class="progress-label">de 2026</span>
         </div>
         <button id="expand-btn" type="button" class="btn btn--ghost btn--expand">Expandir →</button>
+      </div>
+
+      <!-- ── Contabilium import modal ──────────────────────────────────────── -->
+      <div id="ctb-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem">
+        <div class="kpi-card" style="max-width:500px;width:100%;max-height:80vh;overflow-y:auto;min-height:0;padding:1.5rem">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1rem">Importar Contabilium</div>
+          <div id="ctb-modal-body"></div>
+          <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem">
+            <button id="ctb-cancel" type="button" class="btn btn--ghost">Cancelar</button>
+            <button id="ctb-confirm" type="button" class="btn btn--primary">Confirmar →</button>
+          </div>
+        </div>
       </div>
 
       <details class="debug-section">
@@ -176,8 +193,8 @@
       const READONLY_COLS = new Set(['Suma Impuestos', 'Neto']);
       const DATE_COLS    = new Set(['Fecha Compra', 'Fecha Factura']);
 
-      const COLLAPSED_COLS = ['Nombre', 'Fecha Factura', 'Pago', 'Cupón', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Estado'];
-      const EXPANDED_COLS  = ['Orden ID', 'Nombre', 'Fecha Compra', 'Fecha Factura', 'Pago', 'Cupón', 'Retencion IIBB', 'Imp SIRTAC', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Localidad', 'Orígen', 'Estado'];
+      const COLLAPSED_COLS = ['Nombre', 'Fecha Factura', 'Nº Factura', 'Pago', 'Cupón', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Estado'];
+      const EXPANDED_COLS  = ['Orden ID', 'Nombre', 'Fecha Compra', 'Fecha Factura', 'Nº Factura', 'Pago', 'Cupón', 'Retencion IIBB', 'Imp SIRTAC', 'Suma Impuestos', 'Costo Envio', 'Neto', 'Provincia', 'Localidad', 'Orígen', 'Estado'];
 
       const TAX_CATEGORIES = {
         A: 6_800_000,  B: 10_200_000, C: 14_400_000, D: 20_200_000,
@@ -218,24 +235,27 @@
 
       const $ = (id) => document.getElementById(id);
 
-      const fetchBtn      = $('fetch-btn');
-      const fetchLbl      = $('fetch-label');
-      const importBtn     = $('import-btn');
-      const addRowBtn     = $('add-row-btn');
-      const editBtn       = $('edit-btn');
-      const deleteBtn     = $('delete-btn');
-      const expandBtn     = $('expand-btn');
-      const clearCacheBtn = $('clear-cache-btn');
-      const clearCacheSt  = $('clear-cache-status');
-      const stopImportBtn = $('stop-import-btn');
-      const table         = $('orders-table');
-      const exportBtn     = $('export-btn');
-      const openBtn       = $('open-btn');
-      const statusEl      = $('status');
-      const metaCount     = $('meta-count');
-      const metaOldest    = $('meta-oldest');
-      const progressFill  = $('progress-fill');
-      const progressText  = $('progress-text');
+      const fetchBtn        = $('fetch-btn');
+      const fetchLbl        = $('fetch-label');
+      const importBtn       = $('import-btn');
+      const addRowBtn       = $('add-row-btn');
+      const editBtn         = $('edit-btn');
+      const deleteBtn       = $('delete-btn');
+      const expandBtn       = $('expand-btn');
+      const clearCacheBtn   = $('clear-cache-btn');
+      const clearCacheSt    = $('clear-cache-status');
+      const stopImportBtn   = $('stop-import-btn');
+      const table           = $('orders-table');
+      const exportBtn       = $('export-btn');
+      const openBtn         = $('open-btn');
+      const statusEl        = $('status');
+      const metaCount       = $('meta-count');
+      const metaOldest      = $('meta-oldest');
+      const progressFill    = $('progress-fill');
+      const progressText    = $('progress-text');
+      const contabiliumBtn  = $('contabilium-btn');
+      const contabiliumFile = $('contabilium-file');
+      const ctbModal        = $('ctb-modal');
 
       const setStatus = (msg, type = '') => {
         statusEl.textContent = msg;
@@ -279,7 +299,7 @@
         const factIdx  = lastHeaders.indexOf('Fecha Factura');
         if (pagoIdx === -1 || fechaIdx === -1) return;
 
-        const allRows = [...lastFetchedRows, ...getManualRows()];
+        const allRows = [...lastFetchedRows, ...getManualRows(), ...getInvoiceRows()];
 
         // Last 30 days rolling window
         const cutoff30 = new Date(NOW);
@@ -409,9 +429,11 @@
 
       const updateToolbar = () => {
         const count = checkedIds.size;
+        const singleId = count === 1 ? [...checkedIds][0] : null;
+        const isInvoice = singleId?.startsWith('invoice-');
         deleteBtn.disabled = count === 0;
-        editBtn.disabled   = count !== 1;
-        editBtn.textContent  = count > 1 ? '✎ No se puede editar múltiples filas' : '✎ Editar';
+        editBtn.disabled   = count !== 1 || isInvoice;
+        editBtn.textContent = isInvoice ? '✎ No editable' : count > 1 ? '✎ No se puede editar múltiples filas' : '✎ Editar';
         deleteBtn.textContent = '✕ Eliminar';
       };
 
@@ -429,11 +451,12 @@
       };
 
       // ── Edits state ───────────────────────────────────────────────────────
-      let editsState = { manualRows: [], hiddenIds: [], mlOverrides: {} };
+      let editsState = { manualRows: [], hiddenIds: [], mlOverrides: {}, invoiceRows: [] };
 
       const getManualRows   = () => editsState.manualRows;
       const getHiddenIds    = () => new Set(editsState.hiddenIds);
       const getMlOverrides  = () => editsState.mlOverrides;
+      const getInvoiceRows  = () => editsState.invoiceRows || [];
 
       const persistEdits = () =>
         fetch('/api/edits', {
@@ -450,7 +473,7 @@
       let lastHeaders = [];
 
       const getEstado = (row) => {
-        const idx = lastHeaders.indexOf('Fecha Factura');
+        const idx = lastHeaders.indexOf('Nº Factura');
         if (idx === -1) return null;
         const v = row[idx];
         return (!v || v === '') ? 'Pendiente' : 'Facturado';
@@ -461,6 +484,7 @@
 
         const validIds = new Set();
         for (const r of getManualRows()) validIds.add(`manual-${r[0]}-${r[1]}`);
+        for (const r of getInvoiceRows()) validIds.add(`invoice-${r[0]}`);
         const _hidden = getHiddenIds();
         for (const r of rows) { const id = String(r[0]); if (!_hidden.has(id)) validIds.add(id); }
         for (const id of [...checkedIds]) { if (!validIds.has(id)) checkedIds.delete(id); }
@@ -545,6 +569,9 @@
         } else {
           for (const row of manualRows) {
             tbody.append(buildRow(row, `manual-${row[0]}-${row[1]}`, true));
+          }
+          for (const row of getInvoiceRows()) {
+            tbody.append(buildRow(row, `invoice-${row[0]}`, true));
           }
           for (const row of rows) {
             const rowId = String(row[0]);
@@ -650,11 +677,11 @@
             fetch('/api/edits', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ manualRows: [], hiddenIds: [], mlOverrides: {} }),
+              body: JSON.stringify({ manualRows: [], hiddenIds: [], mlOverrides: {}, invoiceRows: [] }),
             }),
           ]);
           if (!cacheRes.ok || !editsRes.ok) throw new Error('Error al limpiar');
-          editsState = { manualRows: [], hiddenIds: [], mlOverrides: {} };
+          editsState = { manualRows: [], hiddenIds: [], mlOverrides: {}, invoiceRows: [] };
           lastFetchedRows = []; lastHeaders = [];
           checkedIds.clear(); table.innerHTML = '';
           importBtn.textContent = 'Importar historial 2026'; importBtn.disabled = false;
@@ -728,10 +755,13 @@
         if (!confirm(`¿Eliminar ${count} fila${count !== 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return;
         const hiddenIds = getHiddenIds();
         let manualRows = getManualRows();
+        let invoiceRows = getInvoiceRows();
         for (const rowId of checkedIds) {
           if (rowId.startsWith('manual-')) manualRows = manualRows.filter((r) => `manual-${r[0]}-${r[1]}` !== rowId);
+          else if (rowId.startsWith('invoice-')) { const k = rowId.slice('invoice-'.length); invoiceRows = invoiceRows.filter((r) => String(r[0]) !== k); }
           else hiddenIds.add(rowId);
         }
+        editsState.invoiceRows = invoiceRows;
         saveManualRows(manualRows); saveHiddenIds(hiddenIds);
         checkedIds.clear(); updateToolbar();
         renderTable({ headers: lastHeaders, rows: lastFetchedRows });
@@ -771,6 +801,7 @@
           editsState.manualRows  = editsData.manualRows  || [];
           editsState.hiddenIds   = editsData.hiddenIds   || [];
           editsState.mlOverrides = editsData.mlOverrides || {};
+          editsState.invoiceRows = editsData.invoiceRows || [];
           if (cacheData.rows?.length) { applyData(cacheData); await enrichExtra(); }
         } catch {}
       };
@@ -788,7 +819,7 @@
           setStatus(`${n} order${n !== 1 ? 's' : ''} loaded.`, 'ok');
           await enrichExtra();
         } catch (err) { setStatus(err.message, 'err'); }
-        finally { fetchBtn.disabled = false; fetchLbl.textContent = '+ Cargar últimos pedidos'; }
+        finally { fetchBtn.disabled = false; fetchLbl.textContent = '+ Cargar pedidos'; }
       });
 
       let importRunning = false, importCompletedNaturally = false;
@@ -843,6 +874,218 @@
       $('period-from').addEventListener('change', updateKPIs);
       $('period-to').addEventListener('change', updateKPIs);
       $('tax-category').addEventListener('change', updateKPIs);
+
+      // ── Contabilium XLSX parser ───────────────────────────────────────────
+
+      async function parseContabiliumXlsx(file) {
+        if (!window.JSZip) throw new Error('JSZip no disponible. Recargá la página e intentá de nuevo.');
+        const zip = await JSZip.loadAsync(await file.arrayBuffer());
+
+        const parseXml = (text) => new DOMParser().parseFromString(text, 'application/xml');
+
+        const ssText = await zip.file('xl/sharedStrings.xml')?.async('text') ?? '<sst/>';
+        const ssDoc  = parseXml(ssText);
+        const sharedStrings = [...ssDoc.getElementsByTagName('si')].map((si) => {
+          const tNodes = si.getElementsByTagName('t');
+          return [...tNodes].map((t) => t.textContent).join('');
+        });
+
+        const wsText = await zip.file('xl/worksheets/sheet1.xml')?.async('text');
+        if (!wsText) throw new Error('No se encontró la hoja de datos en el archivo.');
+        const wsDoc  = parseXml(wsText);
+        const rowEls = [...wsDoc.getElementsByTagName('row')];
+        if (rowEls.length < 2) throw new Error('El archivo no contiene filas de datos.');
+
+        const getCellVal = (cellEl) => {
+          const t = cellEl.getAttribute('t');
+          const vEl = cellEl.getElementsByTagName('v')[0];
+          if (!vEl) return '';
+          if (t === 's') return sharedStrings[+vEl.textContent] ?? '';
+          return vEl.textContent;
+        };
+
+        const colLetter = (ref) => ref.replace(/\d+$/, '');
+
+        // Header row → column-letter-to-name map
+        const colByName = {};
+        for (const cell of rowEls[0].getElementsByTagName('c')) {
+          const name = getCellVal(cell);
+          if (name) colByName[name] = colLetter(cell.getAttribute('r'));
+        }
+        const getCell = (cellMap, header) => cellMap[colByName[header]] ?? '';
+
+        // Group rows by invoice Numero (one invoice can span multiple product lines)
+        const byNumero = new Map();
+        let skippedNC = 0;
+
+        for (const rowEl of rowEls.slice(1)) {
+          const cellMap = {};
+          for (const cell of rowEl.getElementsByTagName('c')) {
+            cellMap[colLetter(cell.getAttribute('r'))] = getCellVal(cell);
+          }
+          const tipo = getCell(cellMap, 'Tipo');
+          if (tipo === 'NC') { skippedNC++; continue; }
+          const numero = getCell(cellMap, 'Numero');
+          if (!numero || byNumero.has(numero)) continue; // keep first line per invoice
+          byNumero.set(numero, cellMap);
+        }
+
+        const mlMatches   = {};
+        const invoiceRows = [];
+
+        for (const [numero, cells] of byNumero) {
+          const integracion = getCell(cells, 'Integracion');
+          const idVenta     = getCell(cells, 'ID Venta Integracion');
+          const fechaRaw    = getCell(cells, 'Fecha'); // DD/MM/YYYY
+          const [dd, mm, yyyy] = fechaRaw.split('/');
+          const fecha = `${yyyy}-${mm}-${dd}`;
+
+          if (integracion === 'MercadoLibre' && idVenta) {
+            mlMatches[idVenta] = { numero, fecha };
+          } else {
+            const razonSocial = getCell(cells, 'Razon Social');
+            const totalFact   = parseFloat(getCell(cells, 'Total Fact') || '0');
+            const provincia   = getCell(cells, 'Provincia');
+            const ciudad      = getCell(cells, 'Ciudad');
+            const origen      = integracion || 'DIRECTO';
+            // Row shape must match OUTPUT_HEADERS order exactly
+            invoiceRows.push([
+              numero, fecha, razonSocial,
+              totalFact, 0, 0, 0, 0, 0, 0, totalFact,
+              ciudad, provincia, origen, fecha, numero,
+            ]);
+          }
+        }
+
+        return { mlMatches, invoiceRows, skippedNC, totalInvoices: byNumero.size };
+      }
+
+      // ── Contabilium modal ─────────────────────────────────────────────────
+
+      let ctbPendingPayload = null;
+
+      const showCtbModal = (mlMatches, invoiceRows, skippedNC, fileName) => {
+        const numFactIdx = lastHeaders.indexOf('Nº Factura');
+        const byOrdId    = new Map(lastFetchedRows.map((r) => [String(r[0]), r]));
+
+        const fresh = [], overwrites = [], unmatched = [];
+        for (const [idVenta, { numero }] of Object.entries(mlMatches)) {
+          const existing = byOrdId.get(idVenta);
+          if (!existing) { unmatched.push(idVenta); continue; }
+          const cur = numFactIdx !== -1 ? existing[numFactIdx] : '';
+          if (cur && cur !== numero) overwrites.push({ ordId: idVenta, old: cur, new: numero });
+          else fresh.push(idVenta);
+        }
+
+        const mlTotal   = Object.keys(mlMatches).length;
+        const nonMlTotal = invoiceRows.length;
+
+        let html = `<p style="font-size:.8rem;color:var(--ink-2);margin:0 0 1rem">
+          Archivo: <strong>${fileName}</strong>
+        </p><div style="display:flex;flex-direction:column;gap:.6rem">`;
+
+        if (mlTotal > 0) {
+          html += `<div style="font-size:.8rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <span class="pill pill--ok">✓ ${fresh.length + overwrites.length} facturas ML</span>
+            ${unmatched.length ? `<span style="color:var(--ink-3)">(${unmatched.length} no están en el caché aún)</span>` : ''}
+          </div>`;
+        }
+
+        if (overwrites.length) {
+          const detail = overwrites.map((o) => `
+            <div style="font-size:.75rem;padding:.5rem;background:var(--cream);border-radius:.25rem;margin-top:.25rem">
+              Orden ${o.ordId}<br>
+              <span style="color:var(--ink-3)">Nº actual:&nbsp; ${o.old}</span><br>
+              <span style="color:var(--ink);font-weight:600">Nº nuevo:&nbsp;&nbsp;${o.new}</span>
+            </div>`).join('');
+          html += `<details style="font-size:.8rem">
+            <summary style="cursor:pointer;color:#92400e;font-weight:600">
+              ⚠ ${overwrites.length} sobrescriben un valor distinto — ver detalle
+            </summary>${detail}
+          </details>`;
+        }
+
+        if (nonMlTotal > 0) {
+          html += `<div style="font-size:.8rem">
+            <span class="pill pill--pending">+ ${nonMlTotal} facturas no-ML</span>
+          </div>`;
+        }
+
+        if (skippedNC > 0) {
+          html += `<div style="font-size:.75rem;color:var(--ink-3)">✕ ${skippedNC} notas de crédito omitidas</div>`;
+        }
+
+        if (mlTotal === 0 && nonMlTotal === 0) {
+          html += `<p style="font-size:.8rem;color:var(--err)">No se encontraron facturas en el archivo.</p>`;
+        }
+
+        html += '</div>';
+
+        $('ctb-modal-body').innerHTML = html;
+        ctbPendingPayload = mlTotal + nonMlTotal > 0 ? { mlMatches, invoiceRows } : null;
+        $('ctb-confirm').disabled = !ctbPendingPayload;
+        ctbModal.style.display = 'flex';
+      };
+
+      $('ctb-cancel').addEventListener('click', () => { ctbModal.style.display = 'none'; ctbPendingPayload = null; });
+
+      $('ctb-confirm').addEventListener('click', async () => {
+        if (!ctbPendingPayload) return;
+        ctbModal.style.display = 'none';
+        setStatus('Importando datos de Contabilium…');
+        $('ctb-confirm').disabled = true;
+        try {
+          const res  = await fetch('/api/invoices/import', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(ctbPendingPayload),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error al importar');
+
+          // Reload both cache and edits to reflect changes
+          const [cacheData, editsData] = await Promise.all([
+            fetch('/api/orders/cache').then((r) => r.json()),
+            fetch('/api/edits').then((r) => r.json()),
+          ]);
+          editsState.manualRows  = editsData.manualRows  || [];
+          editsState.hiddenIds   = editsData.hiddenIds   || [];
+          editsState.mlOverrides = editsData.mlOverrides || {};
+          editsState.invoiceRows = editsData.invoiceRows || [];
+          if (cacheData.rows?.length) applyData(cacheData);
+
+          const parts = [];
+          if (data.ml_updated)      parts.push(`${data.ml_updated} órdenes ML enriquecidas`);
+          if (data.ml_overwritten)  parts.push(`${data.ml_overwritten} sobrescritura${data.ml_overwritten !== 1 ? 's' : ''}`);
+          if (data.invoices_added)  parts.push(`${data.invoices_added} facturas nuevas`);
+          if (data.invoices_replaced) parts.push(`${data.invoices_replaced} facturas actualizadas`);
+          setStatus(parts.length ? parts.join(' · ') : 'Sin cambios.', 'ok');
+        } catch (err) {
+          setStatus(`Error: ${err.message}`, 'err');
+        } finally {
+          $('ctb-confirm').disabled = false;
+          ctbPendingPayload = null;
+        }
+      });
+
+      contabiliumBtn.addEventListener('click', () => contabiliumFile.click());
+
+      contabiliumFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        contabiliumFile.value = '';
+        if (!file) return;
+        contabiliumBtn.disabled = true;
+        setStatus('Procesando archivo…');
+        try {
+          const { mlMatches, invoiceRows, skippedNC } = await parseContabiliumXlsx(file);
+          setStatus('');
+          showCtbModal(mlMatches, invoiceRows, skippedNC, file.name);
+        } catch (err) {
+          setStatus(`Error al procesar archivo: ${err.message}`, 'err');
+        } finally {
+          contabiliumBtn.disabled = false;
+        }
+      });
 
       (async () => {
         try {

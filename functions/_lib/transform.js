@@ -18,6 +18,7 @@ export const OUTPUT_HEADERS = [
   'Provincia',
   'Orígen',
   'Fecha Factura',
+  'Nº Factura',
 ];
 
 const sumPaymentsField = (payments, field) => (
@@ -63,6 +64,7 @@ export function transformOrderToRow(order) {
     nameOf(order.shipping?._state),
     'ML',
     toDateStr(order._fecha_factura),
+    order._numero_factura ?? '',
   ];
 }
 
@@ -77,6 +79,8 @@ function mergePackOrders(orders) {
     _iibb: orders.reduce((sum, o) => sum + toNumber(o._iibb), 0),
     _sirtac: orders.reduce((sum, o) => sum + toNumber(o._sirtac), 0),
     _fecha_factura: orders.find((o) => o._fecha_factura)?._fecha_factura ?? undefined,
+    _numero_factura: orders.find((o) => o._numero_factura)?._numero_factura ?? undefined,
+    _invoice_source: orders.find((o) => o._invoice_source)?._invoice_source ?? undefined,
     _cupon: orders.reduce((sum, o) => sum + toNumber(o._cupon), 0),
   };
 }

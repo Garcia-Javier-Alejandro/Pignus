@@ -468,7 +468,7 @@
           const to   = new Date(toEl.value + 'T23:59:59');
           let sp = 0, bp = 0;
           for (const row of allRows) {
-            const d = new Date(row[fechaIdx]);
+            const d = parseDate(row[fechaIdx]);
             if (isNaN(d) || d < from || d > to) continue;
             sp++;
             bp += Number(row[pagoIdx] || 0);

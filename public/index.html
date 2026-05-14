@@ -75,6 +75,9 @@
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
               <span id="kpi-pending-count"></span>
             </div>
+            <div id="kpi-invoiceable-line" style="display:none;margin-top:.5rem;padding-top:.4rem;border-top:1px solid rgba(0,0,0,.08);font-size:.72rem;color:var(--pending-fg)">
+              Facturable: <strong id="kpi-invoiceable-amount"></strong> · <span id="kpi-invoiceable-count"></span>
+            </div>
           </div>
         </div>
 
@@ -367,6 +370,7 @@
 
         // Pending — rows without Nº Factura
         let pendingCount = 0, pendingAmount = 0, pendingMonthCount = 0;
+        const pendingForLimit = [];
 
         const prevMonth     = CURRENT_MONTH === 0 ? 11 : CURRENT_MONTH - 1;
         const prevMonthYear = CURRENT_MONTH === 0 ? CURRENT_YEAR - 1 : CURRENT_YEAR;
@@ -410,6 +414,7 @@
             pendingCount++;
             pendingAmount += neto + costo;
             if (yr === CURRENT_YEAR && mo === CURRENT_MONTH) pendingMonthCount++;
+            pendingForLimit.push({ date: compraDate, amount: neto + costo });
           }
         }
 
@@ -449,6 +454,22 @@
         const monthlyMax = catMax / 12;
         const remaining  = Math.max(0, catMax - factYear);
         $('kpi-remaining').textContent = ars.format(remaining);
+
+        pendingForLimit.sort((a, b) => a.date - b.date);
+        let invoiceableAcc = 0, invoiceableCount = 0;
+        for (const { amount } of pendingForLimit) {
+          if (invoiceableAcc + amount > remaining) break;
+          invoiceableAcc += amount;
+          invoiceableCount++;
+        }
+        const invLine = $('kpi-invoiceable-line');
+        if (pendingCount > 0 && invoiceableCount > 0) {
+          $('kpi-invoiceable-amount').textContent = ars.format(invoiceableAcc);
+          $('kpi-invoiceable-count').textContent  = `${invoiceableCount} orden${invoiceableCount !== 1 ? 'es' : ''} sin exceder Cat. ${catKey}`;
+          invLine.style.display = '';
+        } else {
+          invLine.style.display = 'none';
+        }
 
         const yearPct  = Math.min(100, (factYear  / catMax)     * 100);
         const monthPct = Math.min(100, (factMonth / monthlyMax) * 100);
@@ -562,6 +583,7 @@
         const tbody    = document.createElement('tbody');
         const hiddenIds    = getHiddenIds();
         const mlOverrides  = getMlOverrides();
+        let invoiceableIds = new Set();
 
         const buildRow = (row, rowId, isManual) => {
           const displayRow = (!isManual && mlOverrides[rowId]) ? mlOverrides[rowId] : row;
@@ -575,10 +597,11 @@
               const estado = getEstado(displayRow);
               if (estado) {
                 const pill = document.createElement('span');
-                pill.className = `pill ${estado === 'Pendiente' ? 'pill--pending' : 'pill--ok'}`;
+                const isFacturable = estado === 'Pendiente' && invoiceableIds.has(rowId);
+                pill.className = `pill ${isFacturable ? 'pill--facturable' : estado === 'Pendiente' ? 'pill--pending' : 'pill--ok'}`;
                 const dot = document.createElement('span');
                 dot.className = 'pill__dot';
-                pill.append(dot, estado);
+                pill.append(dot, isFacturable ? 'Facturable' : estado);
                 td.append(pill);
               }
             } else {
@@ -672,6 +695,45 @@
             const nb = (b.row[nombreColIdx] || '').toLowerCase();
             return na < nb ? -1 : na > nb ? 1 : 0;
           });
+
+          {
+            const _catMax = TAX_CATEGORIES[$('tax-category').value] || TAX_CATEGORIES.H;
+            const _nfIdx  = headers.indexOf('Nº Factura');
+            const _nIdx   = headers.indexOf('Neto');
+            const _cIdx   = headers.indexOf('Costo Envio');
+            const _fIdx   = headers.indexOf('Fecha Compra');
+            const _ffIdx  = headers.indexOf('Fecha Factura');
+            let _factYear = 0;
+            for (const r of [...rows, ...getManualRows(), ...getInvoiceRows()]) {
+              const nf = _nfIdx !== -1 ? (r[_nfIdx] ?? '') : '';
+              if (!nf) continue;
+              const d = parseDate(r[_fIdx]);
+              if (isNaN(d)) continue;
+              const n = _nIdx !== -1 ? Number(r[_nIdx] || 0) : 0;
+              const c = _cIdx !== -1 ? Number(r[_cIdx] || 0) : 0;
+              const fs = _ffIdx !== -1 ? r[_ffIdx] : '';
+              const fd = fs ? parseDate(fs) : d;
+              if ((isNaN(fd) ? d : fd).getFullYear() === CURRENT_YEAR) _factYear += n + c;
+            }
+            const _remaining = Math.max(0, _catMax - _factYear);
+            const _pending = [];
+            for (const { row: r, rowId: rid } of allDisplayRows) {
+              const nf = _nfIdx !== -1 ? (r[_nfIdx] ?? '') : '';
+              if (nf) continue;
+              const d = parseDate(r[_fIdx]);
+              if (isNaN(d)) continue;
+              const n = _nIdx !== -1 ? Number(r[_nIdx] || 0) : 0;
+              const c = _cIdx !== -1 ? Number(r[_cIdx] || 0) : 0;
+              _pending.push({ date: d, amount: n + c, rowId: rid });
+            }
+            _pending.sort((a, b) => a.date - b.date);
+            let _acc = 0;
+            for (const { amount, rowId: rid } of _pending) {
+              if (_acc + amount > _remaining) break;
+              _acc += amount;
+              invoiceableIds.add(rid);
+            }
+          }
 
           for (const { row, rowId, isManual } of allDisplayRows) {
             tbody.append(buildRow(row, rowId, isManual));
@@ -998,7 +1060,7 @@
       $('period-to').addEventListener('input', autoFmtDate);
       $('period-from').addEventListener('change', updateKPIs);
       $('period-to').addEventListener('change', updateKPIs);
-      $('tax-category').addEventListener('change', updateKPIs);
+      $('tax-category').addEventListener('change', () => { updateKPIs(); if (lastHeaders.length) renderTable({ headers: lastHeaders, rows: lastFetchedRows }); });
 
       // ── Contabilium XLSX parser ───────────────────────────────────────────
 

@@ -3,3 +3,9 @@
 .kpi-strip {
   grid-template-columns: 1.3fr 1fr 0.7fr 0.4fr;
 }
+
+.pill--facturable {
+  color: #1d4ed8;
+  background: rgba(29, 78, 216, .07);
+  border-color: rgba(29, 78, 216, .22);
+}

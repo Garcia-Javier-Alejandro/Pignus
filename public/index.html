@@ -122,9 +122,9 @@
         <div class="kpi-card">
           <div class="kpi-card__eyebrow">Período</div>
           <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-            <input type="date" id="period-from" class="manual-input">
+            <input type="text" id="period-from" class="manual-input" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" style="width:7.5rem">
             <span style="color:var(--ink-3)">—</span>
-            <input type="date" id="period-to" class="manual-input">
+            <input type="text" id="period-to" class="manual-input" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" style="width:7.5rem">
           </div>
           <div style="display:flex;gap:1.5rem;margin-top:auto">
             <div class="kpi-inline">
@@ -247,6 +247,13 @@
         if (!val) return new Date(NaN);
         const s = String(val);
         return new Date(s.length === 10 ? s + 'T00:00:00' : s);
+      };
+
+      const parseDMY = (val) => {
+        if (!val) return new Date(NaN);
+        const [d, m, y] = String(val).split('/');
+        if (!d || !m || !y || y.length < 4) return new Date(NaN);
+        return parseDate(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
       };
 
       const formatDate = (val) => {
@@ -464,8 +471,9 @@
         const fromEl = $('period-from');
         const toEl   = $('period-to');
         if (fromEl.value && toEl.value) {
-          const from = parseDate(fromEl.value);
-          const to   = new Date(toEl.value + 'T23:59:59');
+          const from = parseDMY(fromEl.value);
+          const to   = parseDMY(toEl.value);
+          if (!isNaN(to)) to.setHours(23, 59, 59, 999);
           let sp = 0, bp = 0;
           for (const row of allRows) {
             const d = parseDate(row[fechaIdx]);
@@ -980,6 +988,14 @@
       openBtn.addEventListener('click', () => window.open(SHEET_URL, '_blank'));
       $('auth-btn').addEventListener('click', () => { window.location.href = '/api/meli/login'; });
 
+      const autoFmtDate = (e) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+        if (v.length > 5) v = v.slice(0, 5) + '/' + v.slice(5, 9);
+        e.target.value = v;
+      };
+      $('period-from').addEventListener('input', autoFmtDate);
+      $('period-to').addEventListener('input', autoFmtDate);
       $('period-from').addEventListener('change', updateKPIs);
       $('period-to').addEventListener('change', updateKPIs);
       $('tax-category').addEventListener('change', updateKPIs);

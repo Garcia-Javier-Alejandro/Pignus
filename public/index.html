@@ -464,8 +464,10 @@
           invoiceableCutoffDate = date;
         }
         const invLine = $('kpi-invoiceable-line');
-        if (invoiceableCount > 0 && invoiceableCount < pendingCount) {
-          $('kpi-invoiceable-text').textContent = `Las ${invoiceableCount} orden${invoiceableCount !== 1 ? 'es' : ''} con fecha de compra hasta el ${formatDate(invoiceableCutoffDate)} son facturables sin exceder Cat. ${catKey}`;
+        if (invoiceableCount < pendingCount) {
+          $('kpi-invoiceable-text').textContent = invoiceableCount === 0
+            ? `Ninguna orden es facturable sin exceder Cat. ${catKey}`
+            : `Las ${invoiceableCount} orden${invoiceableCount !== 1 ? 'es' : ''} con fecha de compra hasta el ${formatDate(invoiceableCutoffDate)} son facturables sin exceder Cat. ${catKey}`;
           invLine.style.display = 'block';
         } else {
           invLine.style.display = 'none';

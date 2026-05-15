@@ -18,7 +18,9 @@ const isPaid = (o) =>
 
 export async function onRequestGet({ env }) {
   try {
-    const todayART = artDateStr(Date.now());
+    const now = Date.now();
+    const todayART     = artDateStr(now);
+    const yesterdayART = artDateStr(now - 24 * 60 * 60 * 1000);
 
     const tokens = await getValidAccessToken(env);
     const { access_token } = tokens;
@@ -34,7 +36,7 @@ export async function onRequestGet({ env }) {
     const total = probeData.paging?.total ?? 0;
 
     // ML date filter params are unreliable on orders/search.
-    // Fetch the 50 most recent orders and filter to today's ART date client-side.
+    // Fetch the 50 most recent orders and filter client-side.
     const url = new URL('https://api.mercadolibre.com/orders/search');
     url.searchParams.set('seller', sellerId);
     url.searchParams.set('sort', 'date_desc');
@@ -47,31 +49,25 @@ export async function onRequestGet({ env }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || data.error || 'ML orders request failed');
 
-    const allResults = data.results || [];
-    const todayOrders = allResults.filter(
-      (o) => isPaid(o) && artDateStr(new Date(o.date_created).getTime()) === todayART,
-    );
+    const recentOrders = (data.results || []).filter((o) => {
+      if (!isPaid(o)) return false;
+      const d = artDateStr(new Date(o.date_created).getTime());
+      return d === todayART || d === yesterdayART;
+    });
+
+    const fetched_today     = recentOrders.filter((o) => artDateStr(new Date(o.date_created).getTime()) === todayART).length;
+    const fetched_yesterday = recentOrders.length - fetched_today;
 
     // fetchedOffset = total so a fresh cache seeds next_older_offset = total - 20 (correct
     // starting point for the history import), while an existing cache keeps its offset unchanged.
     const result = await fetchEnrichAndStore(env, {
-      orders: todayOrders,
+      orders: recentOrders,
       total,
       fetchedOffset: total,
       isOlderFetch: false,
     });
 
-    return json({
-      ...result,
-      fetched_today: todayOrders.length,
-      total_today: todayOrders.length,
-      // Temporary debug fields — remove once date handling is confirmed correct
-      _debug: {
-        todayART,
-        fetched_from_ml: allResults.length,
-        sample_dates: allResults.slice(0, 3).map((o) => o.date_created),
-      },
-    });
+    return json({ ...result, fetched_today, fetched_yesterday });
   } catch (error) {
     return errorResponse(500, error.message);
   }

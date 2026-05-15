@@ -997,10 +997,14 @@
           if (!res.ok) throw new Error(data.error || 'Error al cargar.');
           applyData(data);
           setLastSync(new Date().toISOString());
-          const n = data.fetched_today ?? 0;
-          const dbg = data._debug;
-          const dbgStr = dbg ? ` [ART: ${dbg.todayART}, ML muestra: ${dbg.sample_dates?.[0] ?? '?'}]` : '';
-          setStatus(`${n} orden${n !== 1 ? 'es' : ''} de hoy cargadas.${dbgStr}`, 'ok');
+          const nHoy  = data.fetched_today     ?? 0;
+          const nAyer = data.fetched_yesterday ?? 0;
+          const parts = [];
+          if (nHoy  > 0) parts.push(`${nHoy} de hoy`);
+          if (nAyer > 0) parts.push(`${nAyer} de ayer`);
+          const label = parts.length ? parts.join(' · ') : '0';
+          const total = nHoy + nAyer;
+          setStatus(`${label} orden${total !== 1 ? 'es' : ''} cargadas.`, 'ok');
           await enrichExtra();
         } catch (err) { setStatus(err.message, 'err'); }
         finally { todayBtn.disabled = false; }

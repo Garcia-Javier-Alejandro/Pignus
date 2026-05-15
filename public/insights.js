@@ -90,6 +90,38 @@
 
   const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+  const SKU_COLORS  = ['#1d4ed8', '#a27a2a', '#1a6b2a', '#9c8f84', '#c23b22', '#c8bfa8'];
+  const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  function svgStackedBars(months, topSkus, monthData, W, H) {
+    if (!months.length || !topSkus.length) return '';
+    const top5Set = new Set(topSkus);
+    const n = months.length;
+    const slot = W / n;
+    const barW = Math.max(1, Math.floor(slot) - 3);
+    const usableH = H - 16;
+
+    return months.map((month, mi) => {
+      const mMap = monthData.get(month) || new Map();
+      const total = [...mMap.values()].reduce((a, b) => a + b, 0);
+      if (!total) return '';
+
+      const x = Math.round(mi * slot + (slot - barW) / 2);
+      const otherUnits = [...mMap.entries()].filter(([k]) => !top5Set.has(k)).reduce((s, [, v]) => s + v, 0);
+      const vals = [...topSkus.map((s) => mMap.get(s) || 0), otherUnits];
+
+      let y = usableH;
+      const rects = vals.map((v, i) => {
+        const segH = Math.round((v / total) * usableH);
+        y -= segH;
+        return segH > 0 ? `<rect x="${x}" y="${y}" width="${barW}" height="${segH}" fill="${SKU_COLORS[i]}" opacity="0.85"/>` : '';
+      }).join('');
+
+      const mm = parseInt(month.slice(5), 10) - 1;
+      return rects + `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 1}" text-anchor="middle" font-size="9" fill="var(--ink-3)">${MONTH_NAMES[mm]}</text>`;
+    }).join('');
+  }
+
   // ── Map state ────────────────────────────────────────────────────────────────
 
   let leafletMap       = null;
@@ -106,7 +138,7 @@
 
   // ── Computation ──────────────────────────────────────────────────────────────
 
-  function compute({ rows, headers, edits }) {
+  function compute({ rows, headers, edits, orders = [] }) {
     const idx = (name) => headers.indexOf(name);
     const I = {
       fecha:    idx('Fecha Compra'),
@@ -222,9 +254,60 @@
       s.neto += I.neto >= 0 ? Number(row[I.neto] || 0) : 0;
     }
 
+    // SKU metrics (populated from raw slim orders; seller_sku only present after Phase C cache rebuild)
+    const skuMap = new Map(); // key -> { title, units, revenue }
+    const unitsPerOrder = [];
+    for (const order of orders) {
+      const items = order.order_items || [];
+      let orderUnits = 0;
+      for (const item of items) {
+        const sku  = item.seller_sku || 'Sin SKU';
+        const ttl  = item.title     || sku;
+        const qty  = item.quantity  || 1;
+        const rev  = qty * (item.unit_price ?? item.full_unit_price ?? 0);
+        orderUnits += qty;
+        if (!skuMap.has(sku)) skuMap.set(sku, { title: ttl, units: 0, revenue: 0 });
+        const s = skuMap.get(sku);
+        s.units   += qty;
+        s.revenue += rev;
+        if (ttl !== sku && s.title === sku) s.title = ttl;
+      }
+      if (orderUnits > 0) unitsPerOrder.push(orderUnits);
+    }
+    const skuRows = [...skuMap.entries()]
+      .map(([sku, s]) => ({ sku, title: s.title, units: s.units, revenue: s.revenue }))
+      .sort((a, b) => b.units - a.units);
+
+    // Mix evolution — last 12 months × top-5 SKUs + Otros
+    const now12 = new Date();
+    const last12 = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now12.getFullYear(), now12.getMonth() - 11 + i, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const monthData = new Map(last12.map((m) => [m, new Map()]));
+    for (const order of orders) {
+      const month = order.date_created ? order.date_created.slice(0, 7) : null;
+      if (!month || !monthData.has(month)) continue;
+      const mMap = monthData.get(month);
+      for (const item of order.order_items || []) {
+        const sku = item.seller_sku || 'Sin SKU';
+        mMap.set(sku, (mMap.get(sku) || 0) + (item.quantity || 1));
+      }
+    }
+    const mixTotals = new Map();
+    for (const mMap of monthData.values()) {
+      for (const [sku, qty] of mMap) mixTotals.set(sku, (mixTotals.get(sku) || 0) + qty);
+    }
+    const mixTopSkus = [...mixTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([s]) => s);
+
     return {
       total: all.length,
       uniqueCust: custCnt.size,
+      medianUnits: median(unitsPerOrder),
+      skuRows,
+      mixMonths: last12,
+      mixTopSkus,
+      monthData,
       repeatRate: custCnt.size ? custVals.filter((v) => v > 1).length / custCnt.size : 0,
       medianOrd: median(custVals),
       pctBA: all.length ? baCount / all.length : 0,
@@ -310,6 +393,51 @@
   // ── Rendering ────────────────────────────────────────────────────────────────
 
   const $  = (id) => document.getElementById(id);
+
+  function renderSkuTable(m) {
+    const el = $('ins-sku');
+    if (!el) return;
+    if (!m.skuRows.length) {
+      el.innerHTML = ey('Top SKUs') +
+        `<span style="font-size:.8rem;color:var(--ink-3)">Disponible después de importar historial con datos de SKU</span>`;
+      return;
+    }
+
+    const sorted = [...m.skuRows]
+      .sort((a, b) => {
+        const va = a[skuSort.col], vb = b[skuSort.col];
+        return skuSort.dir === 'desc' ? vb - va : va - vb;
+      })
+      .slice(0, 20);
+
+    const arrow = (col) => skuSort.col === col ? (skuSort.dir === 'desc' ? ' ↓' : ' ↑') : '';
+    const thClick = (col) => `style="cursor:pointer;user-select:none;${thSt};text-align:right" onclick="(function(){` +
+      `window._skuSort=${JSON.stringify({ col, dir: skuSort.col === col && skuSort.dir === 'desc' ? 'asc' : 'desc' })};` +
+      `window.dispatchEvent(new CustomEvent('sku-sort'))})();"`;
+
+    const rows = sorted.map(({ sku, title, units, revenue }, i) =>
+      `<tr>
+        <td style="padding:.3rem .5rem;font-size:.72rem;color:var(--ink-3);text-align:right">${i + 1}</td>
+        <td style="padding:.3rem .5rem;font-size:.75rem;color:var(--ink-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${title}">${title}</td>
+        <td style="padding:.3rem .5rem;font-size:.72rem;color:var(--ink-3);font-family:monospace">${sku}</td>
+        <td style="padding:.3rem .5rem;font-size:.75rem;text-align:right;color:var(--ink);font-weight:600">${units}</td>
+        <td style="padding:.3rem .5rem;font-size:.75rem;text-align:right;color:var(--ink)">${ars.format(revenue)}</td>
+      </tr>`).join('');
+
+    el.innerHTML = `${ey('Top SKUs — top 20 por unidades vendidas')}
+      <div style="overflow-x:auto;flex:1">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="${thSt};text-align:right;width:2rem">#</th>
+            <th style="${thSt};text-align:left">Producto</th>
+            <th style="${thSt};text-align:left">SKU</th>
+            <th ${thClick('units')}>Unidades${arrow('units')}</th>
+            <th ${thClick('revenue')}>Facturación bruta${arrow('revenue')}</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
   const ey = (t)  => `<div class="kpi-card__eyebrow" style="margin-bottom:.5rem">${t}</div>`;
   const kv = (v)  => `<div class="kpi-card__value" style="font-size:clamp(1.1rem,2vw,1.8rem)">${v}</div>`;
 
@@ -317,8 +445,8 @@
 
   function render(m) {
     if (!m.total) {
-      ['ins-hero-clientes','ins-hero-recompra','ins-hero-mediana','ins-hero-ba',
-       'ins-channel','ins-weekday','ins-velocity','ins-cupon','ins-provincia','ins-carga']
+      ['ins-hero-clientes','ins-hero-recompra','ins-hero-mediana','ins-hero-ba','ins-hero-units',
+       'ins-channel','ins-weekday','ins-velocity','ins-cupon','ins-provincia','ins-carga','ins-sku','ins-mix']
         .forEach((id) => { const el = $(id); if (el) el.innerHTML = `<span style="font-size:.8rem;color:var(--ink-3)">Sin datos</span>`; });
       return;
     }
@@ -328,6 +456,7 @@
     $('ins-hero-recompra').innerHTML = ey('Tasa de recompra')        + kv((m.repeatRate * 100).toFixed(1) + '%');
     $('ins-hero-mediana').innerHTML  = ey('Mediana pedidos/cliente') + kv(m.medianOrd % 1 ? m.medianOrd.toFixed(1) : String(m.medianOrd));
     $('ins-hero-ba').innerHTML       = ey('% BA / CABA')             + kv((m.pctBA * 100).toFixed(1) + '%');
+    $('ins-hero-units').innerHTML    = ey('Unidades por pedido (mediana)') + kv(m.medianUnits ? (m.medianUnits % 1 ? m.medianUnits.toFixed(1) : String(m.medianUnits)) : '—');
 
     // ── Channel mix ─────────────────────────────────────────────────────────
     const slices = [...m.chanMap.entries()]
@@ -430,15 +559,42 @@
         ${svgPolyline(m.burdenR30, '#a27a2a', 400, 64, bMax, 1.5)}
       </svg>`;
 
+    // ── Top SKUs ────────────────────────────────────────────────────────────────
+    renderSkuTable(m);
+
+    // ── Evolución del mix ───────────────────────────────────────────────────────
+    if (m.mixTopSkus.length) {
+      const legend = [...m.mixTopSkus, 'Otros'].map((s, i) =>
+        `<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;margin-right:.8rem">
+          <span style="width:8px;height:8px;border-radius:2px;background:${SKU_COLORS[i]};flex-shrink:0"></span>${s}
+        </span>`).join('');
+      $('ins-mix').innerHTML = `${ey('Evolución del mix — unidades por mes (últimos 12 meses, top 5 SKUs)')}
+        <div style="margin-bottom:.5rem;flex-wrap:wrap">${legend}</div>
+        <svg viewBox="0 0 400 120" width="100%" style="display:block">
+          ${svgStackedBars(m.mixMonths, m.mixTopSkus, m.monthData, 400, 120)}
+        </svg>`;
+    } else {
+      $('ins-mix').innerHTML = ey('Evolución del mix') +
+        `<span style="font-size:.8rem;color:var(--ink-3)">Disponible después de importar historial con datos de SKU</span>`;
+    }
+
     // ── Map (async, fire-and-forget) ────────────────────────────────────────────
     renderMap(m).catch(() => {});
   }
 
   // ── Bootstrap ────────────────────────────────────────────────────────────────
 
+  let lastMetrics = null;
+  let skuSort = { col: 'units', dir: 'desc' };
+
   window.addEventListener('pignus-data', () => {
     const d = window.PIGNUS_DATA;
-    if (d) render(compute(d));
+    if (d) { lastMetrics = compute(d); render(lastMetrics); }
+  });
+
+  window.addEventListener('sku-sort', () => {
+    if (window._skuSort) { skuSort = window._skuSort; delete window._skuSort; }
+    if (lastMetrics) renderSkuTable(lastMetrics);
   });
 
   // When the <details> opens: fix Leaflet if already initialised, or run the deferred first render

@@ -197,11 +197,12 @@
         <summary>Insights</summary>
         <div style="margin-top:1.25rem">
           <!-- Hero strip -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1rem">
             <div class="kpi-card" id="ins-hero-clientes" style="min-height:0"></div>
             <div class="kpi-card" id="ins-hero-recompra" style="min-height:0"></div>
             <div class="kpi-card" id="ins-hero-mediana"  style="min-height:0"></div>
             <div class="kpi-card" id="ins-hero-ba"       style="min-height:0"></div>
+            <div class="kpi-card" id="ins-hero-units"    style="min-height:0"></div>
           </div>
           <!-- Bubble map -->
           <div class="kpi-card" id="ins-map-card" style="padding:1rem 1rem .5rem;overflow:hidden;margin-bottom:1rem">
@@ -216,6 +217,8 @@
             <div class="kpi-card" id="ins-cupon"></div>
             <div class="kpi-card" id="ins-provincia"></div>
             <div class="kpi-card" id="ins-carga" style="grid-column:1/-1"></div>
+            <div class="kpi-card" id="ins-sku"  style="grid-column:1/-1"></div>
+            <div class="kpi-card" id="ins-mix"  style="grid-column:1/-1"></div>
           </div>
         </div>
       </details>
@@ -997,6 +1000,7 @@
         window.PIGNUS_DATA = {
           rows: data.rows || [],
           headers: data.headers || [],
+          orders: data.orders || [],
           edits: editsState,
         };
         window.dispatchEvent(new CustomEvent('pignus-data'));

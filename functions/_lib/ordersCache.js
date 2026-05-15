@@ -32,6 +32,8 @@ function slimOrder(order) {
       unit_price: i.unit_price,
       full_unit_price: i.full_unit_price,
       sale_fee: i.sale_fee,
+      seller_sku: i.item?.seller_sku ?? null,
+      title: i.item?.title ?? null,
     })),
     buyer: order.buyer ? {
       first_name: order.buyer.first_name,

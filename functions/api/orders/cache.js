@@ -16,6 +16,7 @@ export async function onRequestGet({ env }) {
   return json({
     headers: OUTPUT_HEADERS,
     rows,
+    orders: cache.orders || [],
     sheet_url: env.GOOGLE_SHEET_ID
       ? `https://docs.google.com/spreadsheets/d/${env.GOOGLE_SHEET_ID}`
       : null,

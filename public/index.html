@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://ui.pignuslabs.com.ar/pignus.css">
     <link rel="stylesheet" href="/app.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+    <script src="/insights.js" defer></script>
   </head>
   <body>
     <header class="header">
@@ -188,6 +189,27 @@
           </div>
         </div>
       </div>
+
+      <!-- ── Insights ───────────────────────────────────────────────────────── -->
+      <section id="insights" style="margin:1.5rem 0">
+        <div class="kpi-card__eyebrow" style="margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">Análisis</div>
+        <!-- Hero strip -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem">
+          <div class="kpi-card" id="ins-hero-clientes" style="min-height:0"></div>
+          <div class="kpi-card" id="ins-hero-recompra" style="min-height:0"></div>
+          <div class="kpi-card" id="ins-hero-mediana"  style="min-height:0"></div>
+          <div class="kpi-card" id="ins-hero-ba"       style="min-height:0"></div>
+        </div>
+        <!-- Charts grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="kpi-card" id="ins-channel"></div>
+          <div class="kpi-card" id="ins-weekday"></div>
+          <div class="kpi-card" id="ins-velocity" style="grid-column:1/-1"></div>
+          <div class="kpi-card" id="ins-cupon"></div>
+          <div class="kpi-card" id="ins-provincia"></div>
+          <div class="kpi-card" id="ins-carga" style="grid-column:1/-1"></div>
+        </div>
+      </section>
 
       <details class="debug-section">
         <summary>Aux Debug Tools</summary>
@@ -963,6 +985,12 @@
         exportBtn.disabled = false;
         updateMeta(data.meta);
         updateKPIs();
+        window.PIGNUS_DATA = {
+          rows: data.rows || [],
+          headers: data.headers || [],
+          edits: editsState,
+        };
+        window.dispatchEvent(new CustomEvent('pignus-data'));
       };
 
       const loadFromCache = async () => {

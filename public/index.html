@@ -998,9 +998,9 @@
           applyData(data);
           setLastSync(new Date().toISOString());
           const n = data.fetched_today ?? 0;
-          const total = data.total_today ?? n;
-          const extra = total > n ? ` (${total} en total, se muestran las primeras ${n})` : '';
-          setStatus(`${n} orden${n !== 1 ? 'es' : ''} de hoy cargadas${extra}.`, 'ok');
+          const dbg = data._debug;
+          const dbgStr = dbg ? ` [ART: ${dbg.todayART}, ML muestra: ${dbg.sample_dates?.[0] ?? '?'}]` : '';
+          setStatus(`${n} orden${n !== 1 ? 'es' : ''} de hoy cargadas.${dbgStr}`, 'ok');
           await enrichExtra();
         } catch (err) { setStatus(err.message, 'err'); }
         finally { todayBtn.disabled = false; }

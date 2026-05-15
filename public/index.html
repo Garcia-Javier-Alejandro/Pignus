@@ -165,9 +165,6 @@
       <div class="meta-bar" id="meta-bar">
         <button id="today-btn" type="button" class="btn btn--primary">Cargar hoy</button>
         <span class="meta-sep">·</span>
-        <button id="import-btn" type="button" class="btn btn--secondary">Importar historial 2026</button>
-        <button id="stop-import-btn" type="button" class="btn btn--danger" disabled>⏹ Detener</button>
-        <span class="meta-sep">·</span>
         <button id="contabilium-btn" type="button" class="btn btn--secondary">📄 Contabilium</button>
         <input type="file" id="contabilium-file" accept=".xlsx" hidden>
         <span class="meta-sep">·</span>
@@ -198,6 +195,7 @@
       <details class="debug-section">
         <summary>Aux Debug Tools</summary>
         <div class="debug-body">
+          <button id="import-btn" type="button" class="btn btn--secondary">Importar historial 2026</button>
           <button id="clear-cache-btn" type="button" class="btn btn--danger">✕ Limpiar caché</button>
           <button id="clear-dates-btn" type="button" class="btn btn--danger">✕ Limpiar Fecha Factura</button>
           <span id="clear-cache-status" class="debug-status"></span>
@@ -292,7 +290,6 @@
       const expandBtn       = $('expand-btn');
       const clearCacheBtn   = $('clear-cache-btn');
       const clearCacheSt    = $('clear-cache-status');
-      const stopImportBtn   = $('stop-import-btn');
       const table           = $('orders-table');
       const exportBtn       = $('export-btn');
       const openBtn         = $('open-btn');
@@ -1013,18 +1010,14 @@
       let importRunning = false, importCompletedNaturally = false;
 
       const stopImport = () => {
-        importRunning = false; stopImportBtn.disabled = true;
+        importRunning = false;
         importBtn.textContent = 'Importar historial 2026';
       };
-
-      stopImportBtn.addEventListener('click', () => {
-        if (importRunning) { stopImport(); setStatus('Importación detenida.'); }
-      });
 
       importBtn.addEventListener('click', async () => {
         if (importRunning) { stopImport(); setStatus('Importación detenida.'); return; }
         importRunning = true; importCompletedNaturally = false;
-        stopImportBtn.disabled = false; importBtn.textContent = 'Detener ✕';
+        importBtn.textContent = 'Detener ✕';
         setStatus('Importando historial…');
         while (importRunning) {
           try {
@@ -1037,7 +1030,7 @@
             await new Promise((r) => setTimeout(r, 2000));
           } catch (err) { setStatus(err.message, 'err'); importRunning = false; break; }
         }
-        stopImportBtn.disabled = true; importBtn.textContent = 'Importar historial 2026';
+        importBtn.textContent = 'Importar historial 2026';
         if (importCompletedNaturally) {
           setStatus('Enriqueciendo datos adicionales…');
           await enrichExtra();

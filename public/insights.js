@@ -90,6 +90,19 @@
 
   const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+  // ── Map state ────────────────────────────────────────────────────────────────
+
+  let leafletMap     = null;
+  let markerLayer    = null;
+  let geoCachePromise = null;
+
+  const fetchGeoData = () => {
+    if (!geoCachePromise) {
+      geoCachePromise = fetch('/ar-cities.json').then((r) => r.json()).catch(() => ({}));
+    }
+    return geoCachePromise;
+  };
+
   // ── Computation ──────────────────────────────────────────────────────────────
 
   function compute({ rows, headers, edits }) {
@@ -103,6 +116,7 @@
       suma:     idx('Suma Impuestos'),
       envio:    idx('Costo Envio'),
       neto:     idx('Neto'),
+      localidad: idx('Localidad'),
       provincia: idx('Provincia'),
       origen:   idx('Orígen'),
     };
@@ -194,6 +208,19 @@
     const velR7  = rollingMean(velRaw, 7);
     const velR30 = rollingMean(velRaw, 30);
 
+    // City stats (for bubble map)
+    const cityMap = new Map();
+    for (const row of all) {
+      const loc  = I.localidad >= 0 ? (row[I.localidad] || '').trim() : '';
+      const prov = I.provincia >= 0 ? (row[I.provincia] || '').trim() : '';
+      if (!prov) continue;
+      const key = `${loc}|${prov}`;
+      if (!cityMap.has(key)) cityMap.set(key, { orders: 0, neto: 0 });
+      const s = cityMap.get(key);
+      s.orders++;
+      s.neto += I.neto >= 0 ? Number(row[I.neto] || 0) : 0;
+    }
+
     return {
       total: all.length,
       uniqueCust: custCnt.size,
@@ -206,7 +233,69 @@
       conCnt, conNeto, sinCnt, sinNeto,
       provRows,
       burdenR30: rollingMean(burdenRaw, 30),
+      cityMap,
     };
+  }
+
+  // ── Map rendering ────────────────────────────────────────────────────────────
+
+  async function renderMap(m) {
+    if (typeof L === 'undefined' || !m.cityMap.size) return;
+
+    if (!leafletMap) {
+      const container = document.getElementById('ins-map-container');
+      if (!container) return;
+      // OSM tiles are fine for personal use; switch to MapTiler/Stadia if traffic grows
+      leafletMap = L.map(container, { zoomControl: true }).setView([-38, -63], 4);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
+      }).addTo(leafletMap);
+      markerLayer = L.layerGroup().addTo(leafletMap);
+    }
+
+    markerLayer.clearLayers();
+
+    const geoData = await fetchGeoData();
+
+    // Quintile thresholds on neto for opacity ramp
+    const netoArr = [...m.cityMap.values()].map((s) => s.neto).sort((a, b) => a - b);
+    const qLen = netoArr.length;
+    const thresholds = [0.2, 0.4, 0.6, 0.8].map((p) => netoArr[Math.min(Math.floor(p * qLen), qLen - 1)] ?? 0);
+    const quintile  = (neto) => { let i = 0; while (i < 4 && neto > thresholds[i]) i++; return i; };
+    const opacities = [0.15, 0.35, 0.55, 0.75, 1.0];
+
+    const orderCounts = [...m.cityMap.values()].map((s) => s.orders);
+    const maxSqrt     = Math.sqrt(Math.max(...orderCounts, 1));
+    const totalNeto   = netoArr.reduce((a, b) => a + b, 0);
+
+    for (const [key, stats] of m.cityMap) {
+      const pipeIdx = key.indexOf('|');
+      const loc  = key.slice(0, pipeIdx);
+      const prov = key.slice(pipeIdx + 1);
+      const coords    = geoData[key] || geoData[`|${prov}`];
+      if (!coords) continue;
+
+      const isFallback = !geoData[key];
+      const radius  = 4 + (Math.sqrt(stats.orders) / maxSqrt) * 22;
+      const opacity = opacities[quintile(stats.neto)];
+
+      L.circleMarker(coords, {
+        radius,
+        fillColor:   '#1d4ed8',
+        fillOpacity: opacity,
+        color:       '#1d4ed8',
+        weight:      isFallback ? 1 : 0,
+        dashArray:   isFallback ? '3 3' : undefined,
+      })
+      .bindPopup(
+        `<b>${loc || prov}</b>${isFallback ? ' <span style="color:#9c8f84;font-size:.85em">(centroide)</span>' : ''}<br>` +
+        `Pedidos: ${stats.orders}<br>` +
+        `Neto: ${ars.format(stats.neto)}<br>` +
+        `% del total: ${totalNeto ? (stats.neto / totalNeto * 100).toFixed(1) : 0}%`
+      )
+      .addTo(markerLayer);
+    }
   }
 
   // ── Rendering ────────────────────────────────────────────────────────────────
@@ -331,6 +420,9 @@
       <svg viewBox="0 0 400 64" width="100%" style="display:block">
         ${svgPolyline(m.burdenR30, '#a27a2a', 400, 64, bMax, 1.5)}
       </svg>`;
+
+    // ── Map (async, fire-and-forget) ────────────────────────────────────────────
+    renderMap(m).catch(() => {});
   }
 
   // ── Bootstrap ────────────────────────────────────────────────────────────────
@@ -339,4 +431,12 @@
     const d = window.PIGNUS_DATA;
     if (d) render(compute(d));
   });
+
+  // Leaflet needs invalidateSize() after the <details> is opened from a hidden state
+  const insDetails = document.getElementById('insights');
+  if (insDetails) {
+    insDetails.addEventListener('toggle', () => {
+      if (insDetails.open && leafletMap) leafletMap.invalidateSize();
+    });
+  }
 })();

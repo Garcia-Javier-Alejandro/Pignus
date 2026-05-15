@@ -70,7 +70,7 @@ export function mergeIntoCache(cache, { newOrders, total, fetchedOffset, isOlder
     .map(slimOrder);
 
   const allOrders = [...(cache.orders || []), ...added];
-  allOrders.sort((a, b) => (b.date_created > a.date_created ? 1 : -1));
+  allOrders.sort((a, b) => new Date(b.date_created).getTime() - new Date(a.date_created).getTime());
 
   const oldestDate = allOrders.length > 0 ? allOrders[allOrders.length - 1].date_created : null;
 

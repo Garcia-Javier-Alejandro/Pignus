@@ -1,6 +1,15 @@
 const toNumber = (value) => Number(value || 0);
-const toDateStr = (iso) => (iso ? iso.slice(0, 10) : '');
 const nameOf = (v) => (typeof v === 'string' ? v : v?.name) || '';
+
+// ML returns dates with inconsistent timezone offsets (e.g. -04:00 instead of ART -03:00).
+// Always convert to the true ART date before slicing so FECHA COMPRA/FACTURA are correct.
+const ART_OFFSET_MS = 3 * 60 * 60 * 1000;
+const toDateStr = (iso) => {
+  if (!iso) return '';
+  const ms = new Date(iso).getTime();
+  if (isNaN(ms)) return '';
+  return new Date(ms - ART_OFFSET_MS).toISOString().slice(0, 10);
+};
 
 export const OUTPUT_HEADERS = [
   'Orden ID',

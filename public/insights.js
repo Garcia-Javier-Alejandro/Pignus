@@ -86,7 +86,7 @@
   ]);
 
   // TODO: international orders that bypass ML entirely are not in this dataset; wire in when that data source is available
-  const CHANNEL_COLORS = { ML: '#1BBFA1', DIRECTO: '#a27a2a', MANUAL: '#9c8f84' };
+  const CHANNEL_COLORS = { ML: '#1BBFA1', DIRECTO: '#a27a2a', MANUAL: '#9c8f84', GRA: '#7c5cbf' };
 
   const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 

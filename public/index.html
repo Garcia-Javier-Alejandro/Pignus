@@ -167,6 +167,8 @@
       <div class="meta-bar" id="meta-bar">
         <button id="add-row-btn" type="button" class="btn btn--secondary">+ Agregar fila</button>
         <span class="meta-sep">·</span>
+        <button id="add-gra-btn" type="button" class="btn btn--secondary">Ingresos Gra</button>
+        <span class="meta-sep">·</span>
         <button id="today-btn" type="button" class="btn btn--primary">Cargar pedidos de hoy</button>
         <span class="meta-sep">·</span>
         <button id="contabilium-btn" type="button" class="btn btn--secondary">📄 Contabilium</button>
@@ -184,6 +186,17 @@
         <span class="meta-sep">·</span>
         <button id="export-btn" type="button" class="btn btn--secondary" disabled>↗ Añadir a Sheets</button>
         <button id="expand-btn" type="button" class="btn btn--ghost btn--expand">Expandir →</button>
+      </div>
+
+      <!-- ── Gra duplicate-entry error modal ──────────────────────────────── -->
+      <div id="gra-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem">
+        <div class="kpi-card" style="max-width:420px;width:100%;min-height:0;padding:1.5rem">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1rem">Ingreso Gra duplicado</div>
+          <div id="gra-modal-body" style="font-size:.9rem;color:var(--ink-2);line-height:1.5;margin-bottom:1.25rem"></div>
+          <div style="display:flex;justify-content:flex-end">
+            <button id="gra-modal-ok" type="button" class="btn btn--primary">Entendido</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── Contabilium import modal ──────────────────────────────────────── -->
@@ -324,6 +337,7 @@
       const todayBtn        = $('today-btn');
       const importBtn       = $('import-btn');
       const addRowBtn       = $('add-row-btn');
+      const addGraBtn       = $('add-gra-btn');
       const expandBtn       = $('expand-btn');
       const clearCacheBtn   = $('clear-cache-btn');
       const clearCacheSt    = $('clear-cache-status');
@@ -930,6 +944,43 @@
         const { tr, inputs } = buildEditRow(
           lastHeaders, defaults,
           (row) => { const ex = getManualRows(); ex.unshift(row); saveManualRows(ex); tr.remove(); renderTable({ headers: lastHeaders, rows: lastFetchedRows }); },
+          () => tr.remove(),
+        );
+        const tbody = table.querySelector('tbody') || table.appendChild(document.createElement('tbody'));
+        tbody.insertBefore(tr, tbody.firstChild);
+        inputs[lastHeaders[0]]?.focus?.();
+      });
+
+      // ── Add Gra row ───────────────────────────────────────────────────────
+      const showGraModal = (existingDate) => {
+        const fmt = existingDate
+          ? new Date(existingDate + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+          : existingDate;
+        $('gra-modal-body').textContent =
+          `Ya existe un ingreso "Gra" registrado este mes (${fmt}). Solo se permite un ingreso Gra por mes calendario.`;
+        $('gra-modal').style.display = 'flex';
+      };
+      $('gra-modal-ok').addEventListener('click', () => { $('gra-modal').style.display = 'none'; });
+
+      addGraBtn.addEventListener('click', () => {
+        table.querySelector('tr.edit-row')?.remove();
+        if (!lastHeaders.length) { setStatus('Cargá pedidos primero.', 'err'); return; }
+        const defaults = lastHeaders.map((h) => h === 'Orígen' ? 'GRA' : '');
+        const fechaIdx  = lastHeaders.indexOf('Fecha Compra');
+        const origenIdx = lastHeaders.indexOf('Orígen');
+        const { tr, inputs } = buildEditRow(
+          lastHeaders, defaults,
+          (row) => {
+            const newMonth = row[fechaIdx] ? row[fechaIdx].slice(0, 7) : null;
+            if (newMonth) {
+              const conflict = getManualRows().find(
+                (r) => r[origenIdx] === 'GRA' && r[fechaIdx] && r[fechaIdx].slice(0, 7) === newMonth,
+              );
+              if (conflict) { showGraModal(conflict[fechaIdx]); return; }
+            }
+            const ex = getManualRows(); ex.unshift(row); saveManualRows(ex);
+            tr.remove(); renderTable({ headers: lastHeaders, rows: lastFetchedRows });
+          },
           () => tr.remove(),
         );
         const tbody = table.querySelector('tbody') || table.appendChild(document.createElement('tbody'));
